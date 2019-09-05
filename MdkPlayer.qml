@@ -14,6 +14,8 @@ Item {
     property alias playbackState: mdkObject.playbackState
     property alias mediaStatus: mdkObject.mediaStatus
     property alias logLevel: mdkObject.logLevel
+    property alias playbackRate: mdkObject.playbackRate
+    property alias aspectRatio: mdkObject.aspectRatio
 
     signal initFinished
     signal loaded
@@ -35,6 +37,12 @@ Item {
     }
     function seek(position) {
         mdkObject.seek(position);
+    }
+    function rotate(degree) {
+        mdkObject.rotate(degree);
+    }
+    function scale(x, y) {
+        mdkObject.scale(x, y);
     }
     function isPlaying() {
         return mdkObject.playbackState === mdkObject.PlayingState;

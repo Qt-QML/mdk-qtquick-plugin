@@ -57,17 +57,18 @@ Module {
         Property { name: "playbackState"; type: "MdkDeclarativeObject::PlaybackState" }
         Property { name: "mediaStatus"; type: "MdkDeclarativeObject::MediaStatus"; isReadonly: true }
         Property { name: "logLevel"; type: "MdkDeclarativeObject::LogLevel" }
+        Property { name: "playbackRate"; type: "float" }
+        Property { name: "aspectRatio"; type: "float" }
+        Signal { name: "renderVideo" }
+        Signal {
+            name: "setVideoSurfaceSize"
+            Parameter { type: "QSize" }
+        }
         Signal { name: "initFinished" }
         Signal { name: "loaded" }
         Signal { name: "playing" }
         Signal { name: "paused" }
         Signal { name: "stopped" }
-        Method { name: "renderVideo" }
-        Method {
-            name: "setVideoSurfaceSize"
-            Parameter { name: "width"; type: "int" }
-            Parameter { name: "height"; type: "int" }
-        }
         Method {
             name: "open"
             Parameter { name: "value"; type: "QUrl" }
@@ -82,6 +83,15 @@ Module {
         Method {
             name: "seek"
             Parameter { name: "value"; type: "qlonglong" }
+        }
+        Method {
+            name: "rotate"
+            Parameter { name: "value"; type: "int" }
+        }
+        Method {
+            name: "scale"
+            Parameter { name: "x"; type: "float" }
+            Parameter { name: "y"; type: "float" }
         }
     }
     Component {

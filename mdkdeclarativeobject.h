@@ -4,6 +4,7 @@
 #define _MDKDECLARATIVEOBJECT_H
 
 #include <QQuickFramebufferObject>
+#include <QTimer>
 #include <QUrl>
 #include <mdk/Player.h>
 #include <memory>
@@ -26,6 +27,10 @@ class MdkDeclarativeObject : public QQuickFramebufferObject {
                    NOTIFY mediaStatusChanged)
     Q_PROPERTY(MdkDeclarativeObject::LogLevel logLevel READ logLevel WRITE
                    setLogLevel NOTIFY logLevelChanged)
+    Q_PROPERTY(float playbackRate READ playbackRate WRITE setPlaybackRate NOTIFY
+                   playbackRateChanged)
+    Q_PROPERTY(float aspectRatio READ aspectRatio WRITE setAspectRatio NOTIFY
+                   aspectRatioChanged)
 
 public:
     enum PlaybackState { StoppedState, PlayingState, PausedState };
@@ -56,36 +61,39 @@ public:
 
     explicit MdkDeclarativeObject(QQuickItem *parent = nullptr);
 
-    Renderer *createRenderer() const override;
+    [[nodiscard]] Renderer *createRenderer() const override;
 
-    Q_INVOKABLE void renderVideo();
-    Q_INVOKABLE void setVideoSurfaceSize(int width, int height);
-
-    QUrl source() const;
+    [[nodiscard]] QUrl source() const;
     void setSource(const QUrl &value);
 
-    qint64 position() const;
+    [[nodiscard]] qint64 position() const;
     void setPosition(qint64 value);
 
-    qint64 duration() const;
+    [[nodiscard]] qint64 duration() const;
 
-    QSize videoSize() const;
+    [[nodiscard]] QSize videoSize() const;
 
-    float volume() const;
+    [[nodiscard]] float volume() const;
     void setVolume(float value);
 
-    bool mute() const;
+    [[nodiscard]] bool mute() const;
     void setMute(bool value);
 
-    bool seekable() const;
+    [[nodiscard]] bool seekable() const;
 
-    MdkDeclarativeObject::PlaybackState playbackState() const;
+    [[nodiscard]] MdkDeclarativeObject::PlaybackState playbackState() const;
     void setPlaybackState(MdkDeclarativeObject::PlaybackState value);
 
-    MdkDeclarativeObject::MediaStatus mediaStatus() const;
+    [[nodiscard]] MdkDeclarativeObject::MediaStatus mediaStatus() const;
 
-    MdkDeclarativeObject::LogLevel logLevel() const;
+    [[nodiscard]] MdkDeclarativeObject::LogLevel logLevel() const;
     void setLogLevel(MdkDeclarativeObject::LogLevel value);
+
+    [[nodiscard]] float playbackRate() const;
+    void setPlaybackRate(float value);
+
+    [[nodiscard]] float aspectRatio() const;
+    void setAspectRatio(float value);
 
     Q_INVOKABLE void open(const QUrl &value);
     Q_INVOKABLE void play();
@@ -93,17 +101,23 @@ public:
     Q_INVOKABLE void pause();
     Q_INVOKABLE void stop();
     Q_INVOKABLE void seek(qint64 value);
+    Q_INVOKABLE void rotate(int value);
+    Q_INVOKABLE void scale(float x, float y);
 
 private:
     void processMdkEvents();
+    void notify();
 
 private:
-    bool isLoaded() const;
-    bool isPlaying() const;
-    bool isPaused() const;
-    bool isStopped() const;
+    [[nodiscard]] bool isLoaded() const;
+    [[nodiscard]] bool isPlaying() const;
+    [[nodiscard]] bool isPaused() const;
+    [[nodiscard]] bool isStopped() const;
 
 Q_SIGNALS:
+    void renderVideo();
+    void setVideoSurfaceSize(QSize);
+
     void initFinished();
 
     void loaded();
@@ -121,12 +135,15 @@ Q_SIGNALS:
     void playbackStateChanged();
     void mediaStatusChanged();
     void logLevelChanged();
+    void playbackRateChanged();
+    void aspectRatioChanged();
 
 private:
     QUrl m_source = QUrl();
     std::unique_ptr<mdk::Player> player;
-    float m_volume = 1.0;
-    bool m_mute = false;
+    float m_volume = 1.0F;
+    bool m_mute = false, hasVideo = false, hasAudio = false;
+    QTimer timer;
 };
 
 #endif
