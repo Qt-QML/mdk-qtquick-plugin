@@ -118,6 +118,9 @@ private:
     [[nodiscard]] bool isStopped() const;
 
 Q_SIGNALS:
+    void startWatchingProperties();
+    void stopWatchingProperties();
+
     void initFinished();
 
     void loaded();

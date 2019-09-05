@@ -51,7 +51,7 @@ Item {
         return mdkObject.playbackState === mdkObject.PausedState;
     }
     function isStopped() {
-        return mdkObject.playbackState === mdkObject.StoppedState;
+        return !isPlaying() && !isPaused();
     }
 
     Rectangle {

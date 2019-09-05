@@ -59,6 +59,8 @@ Module {
         Property { name: "logLevel"; type: "MdkDeclarativeObject::LogLevel" }
         Property { name: "playbackRate"; type: "float" }
         Property { name: "aspectRatio"; type: "float" }
+        Signal { name: "startWatchingProperties" }
+        Signal { name: "stopWatchingProperties" }
         Signal { name: "initFinished" }
         Signal { name: "loaded" }
         Signal { name: "playing" }

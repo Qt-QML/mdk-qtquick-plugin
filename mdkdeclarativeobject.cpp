@@ -42,12 +42,10 @@ MdkDeclarativeObject::MdkDeclarativeObject(QQuickItem *parent)
     // MUST set before setMedia() because setNextMedia() is called when media is
     // changed
     player->setPreloadImmediately(false);
-    connect(this, &MdkDeclarativeObject::renderVideo, this,
-            [this] { player->renderVideo(); });
-    connect(this, &MdkDeclarativeObject::setVideoSurfaceSize, this,
-            [this](QSize size) {
-                player->setVideoSurfaceSize(size.width(), size.height());
-            });
+    connect(this, &MdkDeclarativeObject::startWatchingProperties, this,
+            [this] { timer.start(1000); });
+    connect(this, &MdkDeclarativeObject::stopWatchingProperties, this,
+            [this] { timer.stop(); });
     connect(&timer, &QTimer::timeout, this, &MdkDeclarativeObject::notify);
     processMdkEvents();
 }
@@ -94,7 +92,6 @@ void MdkDeclarativeObject::setSource(const QUrl &value) {
         }
     });
     player->setState(mdk::PlaybackState::Playing);
-    timer.start(1000);
 }
 
 qint64 MdkDeclarativeObject::position() const {
@@ -283,7 +280,6 @@ void MdkDeclarativeObject::play() {
         return;
     }
     player->setState(mdk::PlaybackState::Playing);
-    timer.start(1000);
 }
 
 void MdkDeclarativeObject::play(const QUrl &value) {
@@ -302,7 +298,6 @@ void MdkDeclarativeObject::pause() {
         return;
     }
     player->setState(mdk::PlaybackState::Paused);
-    timer.stop();
 }
 
 void MdkDeclarativeObject::stop() {
@@ -311,7 +306,6 @@ void MdkDeclarativeObject::stop() {
     }
     player->setState(mdk::PlaybackState::Stopped);
     m_source.clear();
-    timer.stop();
 }
 
 void MdkDeclarativeObject::seek(qint64 value) {
@@ -358,12 +352,15 @@ void MdkDeclarativeObject::processMdkEvents() {
         Q_UNUSED(s)
         Q_EMIT playbackStateChanged();
         if (isPlaying()) {
+            Q_EMIT startWatchingProperties();
             Q_EMIT playing();
         }
         if (isPaused()) {
+            Q_EMIT stopWatchingProperties();
             Q_EMIT paused();
         }
         if (isStopped()) {
+            Q_EMIT stopWatchingProperties();
             Q_EMIT stopped();
         }
     });
@@ -382,5 +379,6 @@ bool MdkDeclarativeObject::isPaused() const {
 }
 
 bool MdkDeclarativeObject::isStopped() const {
-    return player->state() == mdk::PlaybackState::Stopped;
+    // return player->state() == mdk::PlaybackState::Stopped;
+    return !isPlaying() && !isPaused();
 }
