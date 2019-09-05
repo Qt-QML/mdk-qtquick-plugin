@@ -41,3 +41,23 @@ target_wrapper.*
 
 # QtCreator CMake
 CMakeLists.txt.user*
+
+# My
+bin/
+bin64/
+build/
+*.7z
+*.zip
+*.rar
+*.tar
+*.gz
+*.xz
+*.exe
+*.lib
+*.pdb
+*.ilk
+*.exp
+*.obj
+build.user.bat
+user.conf
+doc/
