@@ -63,6 +63,9 @@ public:
 
     [[nodiscard]] Renderer *createRenderer() const override;
 
+    Q_INVOKABLE void renderVideo();
+    Q_INVOKABLE void setVideoSurfaceSize(QSize size);
+
     [[nodiscard]] QUrl source() const;
     void setSource(const QUrl &value);
 
@@ -115,9 +118,6 @@ private:
     [[nodiscard]] bool isStopped() const;
 
 Q_SIGNALS:
-    void renderVideo();
-    void setVideoSurfaceSize(QSize);
-
     void initFinished();
 
     void loaded();

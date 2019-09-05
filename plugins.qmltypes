@@ -59,16 +59,16 @@ Module {
         Property { name: "logLevel"; type: "MdkDeclarativeObject::LogLevel" }
         Property { name: "playbackRate"; type: "float" }
         Property { name: "aspectRatio"; type: "float" }
-        Signal { name: "renderVideo" }
-        Signal {
-            name: "setVideoSurfaceSize"
-            Parameter { type: "QSize" }
-        }
         Signal { name: "initFinished" }
         Signal { name: "loaded" }
         Signal { name: "playing" }
         Signal { name: "paused" }
         Signal { name: "stopped" }
+        Method { name: "renderVideo" }
+        Method {
+            name: "setVideoSurfaceSize"
+            Parameter { name: "size"; type: "QSize" }
+        }
         Method {
             name: "open"
             Parameter { name: "value"; type: "QUrl" }

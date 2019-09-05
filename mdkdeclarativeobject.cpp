@@ -12,15 +12,11 @@ public:
     }
     ~MdkRenderer() override = default;
 
-    void render() override {
-        QMetaObject::invokeMethod(mdkdeclarativeobject, "renderVideo",
-                                  Qt::QueuedConnection);
-    }
+    void render() override { mdkdeclarativeobject->renderVideo(); }
 
     QOpenGLFramebufferObject *
     createFramebufferObject(const QSize &size) override {
-        QMetaObject::invokeMethod(mdkdeclarativeobject, "setVideoSurfaceSize",
-                                  Qt::QueuedConnection, Q_ARG(QSize, size));
+        mdkdeclarativeobject->setVideoSurfaceSize(size);
         QMetaObject::invokeMethod(mdkdeclarativeobject, "initFinished");
         return new QOpenGLFramebufferObject(size);
     }
@@ -61,6 +57,12 @@ MdkDeclarativeObject::createRenderer() const {
     return new MdkRenderer(const_cast<MdkDeclarativeObject *>(this));
 }
 
+void MdkDeclarativeObject::renderVideo() { player->renderVideo(); }
+
+void MdkDeclarativeObject::setVideoSurfaceSize(QSize size) {
+    player->setVideoSurfaceSize(size.width(), size.height());
+}
+
 QUrl MdkDeclarativeObject::source() const {
     return isStopped() ? QUrl() : m_source;
 }
@@ -92,6 +94,7 @@ void MdkDeclarativeObject::setSource(const QUrl &value) {
         }
     });
     player->setState(mdk::PlaybackState::Playing);
+    timer.start(1000);
 }
 
 qint64 MdkDeclarativeObject::position() const {
@@ -280,6 +283,7 @@ void MdkDeclarativeObject::play() {
         return;
     }
     player->setState(mdk::PlaybackState::Playing);
+    timer.start(1000);
 }
 
 void MdkDeclarativeObject::play(const QUrl &value) {
@@ -298,6 +302,7 @@ void MdkDeclarativeObject::pause() {
         return;
     }
     player->setState(mdk::PlaybackState::Paused);
+    timer.stop();
 }
 
 void MdkDeclarativeObject::stop() {
@@ -306,6 +311,7 @@ void MdkDeclarativeObject::stop() {
     }
     player->setState(mdk::PlaybackState::Stopped);
     m_source.clear();
+    timer.stop();
 }
 
 void MdkDeclarativeObject::seek(qint64 value) {
@@ -352,15 +358,12 @@ void MdkDeclarativeObject::processMdkEvents() {
         Q_UNUSED(s)
         Q_EMIT playbackStateChanged();
         if (isPlaying()) {
-            timer.start(1000);
             Q_EMIT playing();
         }
         if (isPaused()) {
-            timer.stop();
             Q_EMIT paused();
         }
         if (isStopped()) {
-            timer.stop();
             Q_EMIT stopped();
         }
     });
