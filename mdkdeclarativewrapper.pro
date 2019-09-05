@@ -125,5 +125,4 @@ exists($$QDOC) {
         docs.commands = $$QDOC $$_PRO_FILE_PWD_/mdkdeclarativewrapper.qdocconf
     }
     QMAKE_EXTRA_TARGETS += docs
-    POST_TARGETDEPS += docs
 }
