@@ -45,13 +45,13 @@ Item {
         mdkObject.scale(x, y);
     }
     function isPlaying() {
-        return mdkObject.playbackState === mdkObject.PlayingState;
+        return mdkObject.playbackState === MdkObject.PlayingState;
     }
     function isPaused() {
-        return mdkObject.playbackState === mdkObject.PausedState;
+        return mdkObject.playbackState === MdkObject.PausedState;
     }
     function isStopped() {
-        return !isPlaying() && !isPaused();
+        return mdkObject.playbackState === MdkObject.StoppedState;
     }
 
     Rectangle {

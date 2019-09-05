@@ -379,6 +379,5 @@ bool MdkDeclarativeObject::isPaused() const {
 }
 
 bool MdkDeclarativeObject::isStopped() const {
-    // return player->state() == mdk::PlaybackState::Stopped;
-    return !isPlaying() && !isPaused();
+    return player->state() == mdk::PlaybackState::Stopped;
 }
