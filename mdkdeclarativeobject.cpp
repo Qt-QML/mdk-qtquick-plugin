@@ -49,6 +49,8 @@ MdkDeclarativeObject::MdkDeclarativeObject(QQuickItem *parent)
     connect(&timer, &QTimer::timeout, this, &MdkDeclarativeObject::notify);
     connect(this, &MdkDeclarativeObject::sourceChanged, this,
             &MdkDeclarativeObject::fileNameChanged);
+    connect(this, &MdkDeclarativeObject::sourceChanged, this,
+            &MdkDeclarativeObject::pathChanged);
     processMdkEvents();
 }
 
@@ -97,13 +99,17 @@ void MdkDeclarativeObject::setSource(const QUrl &value) {
 }
 
 QString MdkDeclarativeObject::fileName() const {
-    return isStopped()
+    return (isStopped() || !m_source.isValid())
         ? QString()
-        : (m_source.isValid()
-               ? (m_source.isLocalFile()
-                      ? QDir::toNativeSeparators(m_source.toLocalFile())
-                      : m_source.url())
-               : QString());
+        : (m_source.isLocalFile() ? m_source.fileName() : m_source.url());
+}
+
+QString MdkDeclarativeObject::path() const {
+    return (isStopped() || !m_source.isValid())
+        ? QString()
+        : (m_source.isLocalFile()
+               ? QDir::toNativeSeparators(m_source.toLocalFile())
+               : m_source.url());
 }
 
 qint64 MdkDeclarativeObject::position() const {

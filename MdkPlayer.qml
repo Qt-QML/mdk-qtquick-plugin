@@ -6,6 +6,7 @@ Item {
 
     property alias source: mdkObject.source
     property alias fileName: mdkObject.fileName
+    property alias path: mdkObject.path
     property alias position: mdkObject.position
     property alias duration: mdkObject.duration
     property alias videoSize: mdkObject.videoSize

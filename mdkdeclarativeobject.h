@@ -14,6 +14,7 @@ class MdkDeclarativeObject : public QQuickFramebufferObject {
 
     Q_PROPERTY(QUrl source READ source WRITE setSource NOTIFY sourceChanged)
     Q_PROPERTY(QString fileName READ fileName NOTIFY fileNameChanged)
+    Q_PROPERTY(QString path READ path NOTIFY pathChanged)
     Q_PROPERTY(
         qint64 position READ position WRITE setPosition NOTIFY positionChanged)
     Q_PROPERTY(qint64 duration READ duration NOTIFY durationChanged)
@@ -71,6 +72,8 @@ public:
     void setSource(const QUrl &value);
 
     [[nodiscard]] QString fileName() const;
+
+    [[nodiscard]] QString path() const;
 
     [[nodiscard]] qint64 position() const;
     void setPosition(qint64 value);
@@ -131,6 +134,7 @@ Q_SIGNALS:
 
     void sourceChanged();
     void fileNameChanged();
+    void pathChanged();
     void positionChanged();
     void durationChanged();
     void videoSizeChanged();
