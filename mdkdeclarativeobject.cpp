@@ -1,5 +1,6 @@
 #include "mdkdeclarativeobject.h"
 #include <QDebug>
+#include <QDir>
 #include <QOpenGLFramebufferObject>
 
 class MdkRenderer : public QQuickFramebufferObject::Renderer {
@@ -98,9 +99,11 @@ void MdkDeclarativeObject::setSource(const QUrl &value) {
 QString MdkDeclarativeObject::fileName() const {
     return isStopped()
         ? QString()
-        : (m_source.isValid() ? (m_source.isLocalFile() ? m_source.toLocalFile()
-                                                        : m_source.url())
-                              : QString());
+        : (m_source.isValid()
+               ? (m_source.isLocalFile()
+                      ? QDir::toNativeSeparators(m_source.toLocalFile())
+                      : m_source.url())
+               : QString());
 }
 
 qint64 MdkDeclarativeObject::position() const {
