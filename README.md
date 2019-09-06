@@ -50,7 +50,7 @@ MdkPlayer {
 Notes
 
 - `MdkPlayer` (defined in [*MdkPlayer.qml*](/MdkPlayer.qml)) is just a simple wrapper of the QML type `MdkObject` (defined in [*mdkdeclarativeobject.h*](/mdkdeclarativeobject.h) and [*mdkdeclarativeobject.cpp*](/mdkdeclarativeobject.cpp)). You can also use `MdkObject` directly if you want. It's usage is exactly the same with `MdkPlayer`.
-- `mdkPlayer.duration`, `mdkPlayer.position` and `mdkPlayer.seek(position)` use **milliseconds** instead of seconds.
+- `mdkPlayer.duration`, `mdkPlayer.position` and `mdkPlayer.seek(position)` use **MILLISECONDS** instead of seconds.
 - `mdkPlayer.seek(position)` uses absolute position, not relative offset.
 - You can use `mdkPlayer.open(url)` to load and play *url* directly, it is equivalent to `mdkPlayer.source = url` (no need to call `mdkPlayer.play()` manually, because the playback will start immediately once the source url is changed).
 - You can also use `mdkPlayer.play()` to resume a paused playback, `mdkPlayer.pause()` to pause a playing playback, `mdkPlayer.stop()` to stop a loaded playback and `mdkPlayer.seek(position)` to jump to a different position.
