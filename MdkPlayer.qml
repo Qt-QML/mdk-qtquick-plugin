@@ -5,6 +5,7 @@ Item {
     id: mdkPlayer
 
     property alias source: mdkObject.source
+    property alias fileName: mdkObject.fileName
     property alias position: mdkObject.position
     property alias duration: mdkObject.duration
     property alias videoSize: mdkObject.videoSize
@@ -17,7 +18,6 @@ Item {
     property alias playbackRate: mdkObject.playbackRate
     property alias aspectRatio: mdkObject.aspectRatio
 
-    signal initFinished
     signal loaded
     signal playing
     signal paused
@@ -62,7 +62,6 @@ Item {
     MdkObject {
         id: mdkObject
         anchors.fill: mdkPlayer
-        onInitFinished: mdkPlayer.initFinished()
         onLoaded: mdkPlayer.loaded()
         onPlaying: mdkPlayer.playing()
         onPaused: mdkPlayer.paused()

@@ -48,6 +48,7 @@ Module {
             }
         }
         Property { name: "source"; type: "QUrl" }
+        Property { name: "fileName"; type: "string"; isReadonly: true }
         Property { name: "position"; type: "qlonglong" }
         Property { name: "duration"; type: "qlonglong"; isReadonly: true }
         Property { name: "videoSize"; type: "QSize"; isReadonly: true }
@@ -61,7 +62,6 @@ Module {
         Property { name: "aspectRatio"; type: "float" }
         Signal { name: "startWatchingProperties" }
         Signal { name: "stopWatchingProperties" }
-        Signal { name: "initFinished" }
         Signal { name: "loaded" }
         Signal { name: "playing" }
         Signal { name: "paused" }

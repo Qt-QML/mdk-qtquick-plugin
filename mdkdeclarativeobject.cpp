@@ -17,7 +17,6 @@ public:
     QOpenGLFramebufferObject *
     createFramebufferObject(const QSize &size) override {
         mdkdeclarativeobject->setVideoSurfaceSize(size);
-        QMetaObject::invokeMethod(mdkdeclarativeobject, "initFinished");
         return new QOpenGLFramebufferObject(size);
     }
 
@@ -28,7 +27,7 @@ private:
 MdkDeclarativeObject::MdkDeclarativeObject(QQuickItem *parent)
     : QQuickFramebufferObject(parent), player(std::make_unique<mdk::Player>()) {
     Q_ASSERT(player != nullptr);
-#ifdef Q_OS_WIN
+#ifdef Q_OS_WINDOWS
     player->setVideoDecoders({"MFT:d3d=11", "MFT:d3d=9", "MFT", "D3D11", "DXVA",
                               "CUDA", "NVDEC", "FFmpeg"});
 #elif defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
@@ -43,10 +42,12 @@ MdkDeclarativeObject::MdkDeclarativeObject(QQuickItem *parent)
     // changed
     player->setPreloadImmediately(false);
     connect(this, &MdkDeclarativeObject::startWatchingProperties, this,
-            [this] { timer.start(1000); });
+            [this] { timer.start(500); });
     connect(this, &MdkDeclarativeObject::stopWatchingProperties, this,
             [this] { timer.stop(); });
     connect(&timer, &QTimer::timeout, this, &MdkDeclarativeObject::notify);
+    connect(this, &MdkDeclarativeObject::sourceChanged, this,
+            &MdkDeclarativeObject::fileNameChanged);
     processMdkEvents();
 }
 
@@ -92,6 +93,14 @@ void MdkDeclarativeObject::setSource(const QUrl &value) {
         }
     });
     player->setState(mdk::PlaybackState::Playing);
+}
+
+QString MdkDeclarativeObject::fileName() const {
+    return isStopped()
+        ? QString()
+        : (m_source.isValid() ? (m_source.isLocalFile() ? m_source.toLocalFile()
+                                                        : m_source.url())
+                              : QString());
 }
 
 qint64 MdkDeclarativeObject::position() const {
