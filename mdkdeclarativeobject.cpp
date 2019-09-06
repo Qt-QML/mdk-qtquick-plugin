@@ -37,7 +37,7 @@ MdkDeclarativeObject::MdkDeclarativeObject(QQuickItem *parent)
     player->setVideoDecoders({"VT", "VideoToolbox", "FFmpeg"});
 #endif
     player->setRenderCallback([this](void * /*unused*/) {
-        QMetaObject::invokeMethod(this, "update", Qt::QueuedConnection);
+        QMetaObject::invokeMethod(this, "update");
     });
     // MUST set before setMedia() because setNextMedia() is called when media is
     // changed
