@@ -3,3 +3,4 @@ plugin mdkwrapperplugin
 classname MdkDeclarativeWrapper
 typeinfo plugins.qmltypes
 MdkPlayer 1.0 MdkPlayer.qml
+designersupported
