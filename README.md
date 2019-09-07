@@ -205,4 +205,4 @@ Before doing anything else, I will assume you have already installed a widely-us
 
 ## License
 
-[GNU General Public License version 3](/LICENSE.md)
+[GNU Lesser General Public License version 3](/LICENSE.md)

@@ -33,7 +33,7 @@ VERSION = 1.0.0.0
 win32: shared {
     QMAKE_TARGET_PRODUCT = "MdkDeclarativeWrapper"
     QMAKE_TARGET_DESCRIPTION = "MDK wrapper for Qt Quick"
-    QMAKE_TARGET_COPYRIGHT = "GNU General Public License version 3"
+    QMAKE_TARGET_COPYRIGHT = "GNU Lesser General Public License version 3"
     QMAKE_TARGET_COMPANY = "wangwenx190"
     CONFIG += skip_target_version_ext
 }
