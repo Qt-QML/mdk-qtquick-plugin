@@ -17,34 +17,34 @@ Module {
         Enum {
             name: "PlaybackState"
             values: {
-                "StoppedState": 0,
-                "PlayingState": 1,
-                "PausedState": 2
+                "Stopped": 0,
+                "Playing": 1,
+                "Paused": 2
             }
         }
         Enum {
             name: "MediaStatus"
             values: {
-                "UnknownMediaStatus": 0,
+                "Unknown": 0,
                 "NoMedia": 1,
-                "LoadingMedia": 2,
-                "LoadedMedia": 3,
-                "StalledMedia": 4,
-                "BufferingMedia": 5,
-                "BufferedMedia": 6,
-                "EndOfMedia": 7,
-                "InvalidMedia": 8
+                "Loading": 2,
+                "Loaded": 3,
+                "Stalled": 4,
+                "Buffering": 5,
+                "Buffered": 6,
+                "End": 7,
+                "Invalid": 8
             }
         }
         Enum {
             name: "LogLevel"
             values: {
-                "NoLog": 0,
-                "DebugLevel": 1,
-                "WarningLevel": 2,
-                "CriticalLevel": 3,
-                "FatalLevel": 4,
-                "InfoLevel": 5
+                "Off": 0,
+                "Debug": 1,
+                "Warning": 2,
+                "Critical": 3,
+                "Fatal": 4,
+                "Info": 5
             }
         }
         Property { name: "source"; type: "QUrl" }

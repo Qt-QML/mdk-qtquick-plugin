@@ -35,30 +35,23 @@ class MdkDeclarativeObject : public QQuickFramebufferObject {
                    aspectRatioChanged)
 
 public:
-    enum PlaybackState { StoppedState, PlayingState, PausedState };
+    enum class PlaybackState { Stopped, Playing, Paused };
     Q_ENUM(PlaybackState)
 
-    enum MediaStatus {
-        UnknownMediaStatus,
+    enum class MediaStatus {
+        Unknown,
         NoMedia,
-        LoadingMedia,
-        LoadedMedia,
-        StalledMedia,
-        BufferingMedia,
-        BufferedMedia,
-        EndOfMedia,
-        InvalidMedia
+        Loading,
+        Loaded,
+        Stalled,
+        Buffering,
+        Buffered,
+        End,
+        Invalid
     };
     Q_ENUM(MediaStatus)
 
-    enum LogLevel {
-        NoLog,
-        DebugLevel,
-        WarningLevel,
-        CriticalLevel,
-        FatalLevel,
-        InfoLevel
-    };
+    enum class LogLevel { Off, Debug, Warning, Critical, Fatal, Info };
     Q_ENUM(LogLevel)
 
     explicit MdkDeclarativeObject(QQuickItem *parent = nullptr);

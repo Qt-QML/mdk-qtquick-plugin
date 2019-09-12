@@ -165,13 +165,13 @@ MdkDeclarativeObject::PlaybackState
 MdkDeclarativeObject::playbackState() const {
     switch (player->state()) {
     case mdk::PlaybackState::Playing:
-        return PlaybackState::PlayingState;
+        return PlaybackState::Playing;
     case mdk::PlaybackState::Paused:
-        return PlaybackState::PausedState;
+        return PlaybackState::Paused;
     case mdk::PlaybackState::Stopped:
-        return PlaybackState::StoppedState;
+        return PlaybackState::Stopped;
     }
-    return PlaybackState::StoppedState;
+    return PlaybackState::Stopped;
 }
 
 void MdkDeclarativeObject::setPlaybackState(
@@ -180,13 +180,13 @@ void MdkDeclarativeObject::setPlaybackState(
         return;
     }
     switch (value) {
-    case PlaybackState::PlayingState:
+    case PlaybackState::Playing:
         player->setState(mdk::PlaybackState::Playing);
         break;
-    case PlaybackState::PausedState:
+    case PlaybackState::Paused:
         player->setState(mdk::PlaybackState::Paused);
         break;
-    case PlaybackState::StoppedState:
+    case PlaybackState::Stopped:
         player->setState(mdk::PlaybackState::Stopped);
         break;
     }
@@ -197,38 +197,38 @@ MdkDeclarativeObject::MediaStatus MdkDeclarativeObject::mediaStatus() const {
     case mdk::MediaStatus::NoMedia:
         return MediaStatus::NoMedia;
     case mdk::MediaStatus::Loading:
-        return MediaStatus::LoadingMedia;
+        return MediaStatus::Loading;
     case mdk::MediaStatus::Loaded:
-        return MediaStatus::LoadedMedia;
+        return MediaStatus::Loaded;
     case mdk::MediaStatus::Stalled:
-        return MediaStatus::StalledMedia;
+        return MediaStatus::Stalled;
     case mdk::MediaStatus::Buffering:
-        return MediaStatus::BufferingMedia;
+        return MediaStatus::Buffering;
     case mdk::MediaStatus::Buffered:
-        return MediaStatus::BufferedMedia;
+        return MediaStatus::Buffered;
     case mdk::MediaStatus::End:
-        return MediaStatus::EndOfMedia;
+        return MediaStatus::End;
     case mdk::MediaStatus::Invalid:
-        return MediaStatus::InvalidMedia;
+        return MediaStatus::Invalid;
     default:
-        return MediaStatus::UnknownMediaStatus;
+        return MediaStatus::Unknown;
     }
 }
 
 MdkDeclarativeObject::LogLevel MdkDeclarativeObject::logLevel() const {
     switch (mdk::logLevel()) {
     case mdk::LogLevel::Off:
-        return LogLevel::NoLog;
+        return LogLevel::Off;
     case mdk::LogLevel::Debug:
-        return LogLevel::DebugLevel;
+        return LogLevel::Debug;
     case mdk::LogLevel::Warning:
-        return LogLevel::WarningLevel;
+        return LogLevel::Warning;
     case mdk::LogLevel::Error:
-        return LogLevel::CriticalLevel;
+        return LogLevel::Critical;
     case mdk::LogLevel::Info:
-        return LogLevel::InfoLevel;
+        return LogLevel::Info;
     default:
-        return LogLevel::DebugLevel;
+        return LogLevel::Debug;
     }
 }
 
@@ -237,20 +237,20 @@ void MdkDeclarativeObject::setLogLevel(MdkDeclarativeObject::LogLevel value) {
         return;
     }
     switch (value) {
-    case LogLevel::NoLog:
+    case LogLevel::Off:
         mdk::setLogLevel(mdk::LogLevel::Off);
         break;
-    case LogLevel::DebugLevel:
+    case LogLevel::Debug:
         mdk::setLogLevel(mdk::LogLevel::Debug);
         break;
-    case LogLevel::WarningLevel:
+    case LogLevel::Warning:
         mdk::setLogLevel(mdk::LogLevel::Warning);
         break;
-    case LogLevel::CriticalLevel:
-    case LogLevel::FatalLevel:
+    case LogLevel::Critical:
+    case LogLevel::Fatal:
         mdk::setLogLevel(mdk::LogLevel::Error);
         break;
-    case LogLevel::InfoLevel:
+    case LogLevel::Info:
         mdk::setLogLevel(mdk::LogLevel::Info);
         break;
     }

@@ -36,7 +36,7 @@ MdkPlayer {
     id: mdkPlayer
 
     source: "file:///D:/Videos/test.mkv" // playback will start immediately once the source url is changed
-    logLevel: MdkObject.DebugLevel
+    logLevel: MdkObject.Debug
     volume: 0.8 // 0-1.0
 
     onPositionChanged: // do something
@@ -178,7 +178,7 @@ Before doing anything else, I will assume you have already installed a widely-us
 
    MdkPlayer {
        // ...
-       logLevel: MdkObject.DebugLevel // type: enum
+       logLevel: MdkObject.Debug // type: enum
        // ...
    }
    ```
