@@ -63,3 +63,5 @@ build.user.sh
 user.conf
 [Dd]oc/
 Thumbs.db
+*.rc
+*.qm
