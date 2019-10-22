@@ -75,6 +75,7 @@ void MdkDeclarativeObject::setSource(const QUrl &value) {
     }
     player->setNextMedia(nullptr);
     player->setState(mdk::PlaybackState::Stopped);
+    player->waitFor(mdk::PlaybackState::Stopped);
     // 1st url may be the same as current url
     player->setMedia(nullptr);
     player->setMedia(value.isLocalFile() ? qPrintable(value.toLocalFile())
@@ -83,7 +84,6 @@ void MdkDeclarativeObject::setSource(const QUrl &value) {
     Q_EMIT sourceChanged();
     player->scale(1.0F, -1.0F);
     Q_EMIT positionChanged();
-    player->waitFor(mdk::PlaybackState::Stopped);
     player->prepare(0, [this](int64_t position, bool * /*unused*/) {
         Q_UNUSED(position)
         const auto &info = player->mediaInfo();
