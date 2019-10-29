@@ -113,15 +113,14 @@ QString MdkDeclarativeObject::path() const {
 }
 
 qint64 MdkDeclarativeObject::position() const {
-    return isStopped() ? 0
-                       : qMin(qMax(player->position(), qint64(0)), duration());
+    return isStopped() ? 0 : qBound(qint64(0), player->position(), duration());
 }
 
 void MdkDeclarativeObject::setPosition(qint64 value) {
     if (isStopped() || (value == position())) {
         return;
     }
-    seek(qMin(qMax(value, qint64(0)), duration()));
+    seek(qBound(qint64(0), value, duration()));
 }
 
 qint64 MdkDeclarativeObject::duration() const {
@@ -136,14 +135,14 @@ QSize MdkDeclarativeObject::videoSize() const {
 }
 
 float MdkDeclarativeObject::volume() const {
-    return qMin(qMax(m_volume, 0.0F), 1.0F);
+    return qBound(0.0F, m_volume, 1.0F);
 }
 
 void MdkDeclarativeObject::setVolume(float value) {
     if (value == volume()) {
         return;
     }
-    player->setVolume(qMin(qMax(value, 0.0F), 1.0F));
+    player->setVolume(qBound(0.0F, value, 1.0F));
     m_volume = value;
     Q_EMIT volumeChanged();
 }
@@ -330,14 +329,14 @@ void MdkDeclarativeObject::seek(qint64 value) {
     if (isStopped() || (value == position())) {
         return;
     }
-    player->seek(qMin(qMax(value, qint64(0)), duration()));
+    player->seek(qBound(qint64(0), value, duration()));
 }
 
 void MdkDeclarativeObject::rotate(int value) {
     if (isStopped()) {
         return;
     }
-    player->rotate(qMin(qMax(value, 0), 359));
+    player->rotate(qBound(0, value, 359));
 }
 
 void MdkDeclarativeObject::scale(float x, float y) {
