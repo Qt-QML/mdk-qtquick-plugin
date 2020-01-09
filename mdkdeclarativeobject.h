@@ -58,8 +58,8 @@ public:
 
     [[nodiscard]] Renderer *createRenderer() const override;
 
-    Q_INVOKABLE void renderVideo();
-    Q_INVOKABLE void setVideoSurfaceSize(QSize size);
+    void renderVideo();
+    void setVideoSurfaceSize(QSize size);
 
     [[nodiscard]] QUrl source() const;
     void setSource(const QUrl &value);

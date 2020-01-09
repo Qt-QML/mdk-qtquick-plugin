@@ -347,6 +347,15 @@ void MdkDeclarativeObject::scale(float x, float y) {
 }
 
 void MdkDeclarativeObject::processMdkEvents() {
+    mdk::setLogHandler([](mdk::LogLevel level, const char *msg) {
+        if (level >=
+            std::underlying_type<mdk::LogLevel>::type(mdk::LogLevel::Info)) {
+            qDebug().noquote() << msg;
+        } else if (level >= std::underlying_type<mdk::LogLevel>::type(
+                                mdk::LogLevel::Warning)) {
+            qWarning().noquote() << msg;
+        }
+    });
     player->currentMediaChanged([this] {
         qDebug().noquote() << "Current media changed:" << player->url();
         Q_EMIT sourceChanged();
