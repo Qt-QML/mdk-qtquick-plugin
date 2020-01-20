@@ -132,6 +132,20 @@ Before doing anything else, I will assume you have already installed a widely-us
 
 ## FAQ
 
+- How to enable hardware decoding?
+
+  ```cpp
+  #ifdef Q_OS_WINDOWS
+      player->setVideoDecoders({"MFT:d3d=11", "MFT:d3d=9", "MFT", "D3D11", "DXVA", "CUDA", "NVDEC", "FFmpeg"});
+  #elif defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+      player->setVideoDecoders({"VAAPI", "VDPAU", "CUDA", "NVDEC", "FFmpeg"});
+  #elif defined(Q_OS_MACOS)
+      player->setVideoDecoders({"VT", "VideoToolbox", "FFmpeg"});
+  #endif
+  ```
+
+  In most cases, only the `FFmpeg` decoder uses software decoding. You can enable hardware decoding by switching to any decoders except for it.
+
 - Why is the playback process not smooth enough or even stuttering?
 
    If you can insure the video file itself isn't damaged, then here are three possible reasons and their corresponding solutions:
