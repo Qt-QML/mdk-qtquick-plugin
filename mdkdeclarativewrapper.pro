@@ -9,23 +9,29 @@ CONFIG += relative_qt_rpath
 isEmpty(MDK_SDK_DIR) {
     error("You have to setup \"MDK_SDK_DIR\" in \"user.conf\" first!")
 } else {
-    MDK_BIN_DIR = $$MDK_SDK_DIR/bin/x
-    MDK_LIB_DIR = $$MDK_SDK_DIR/lib/x
-    contains(QMAKE_TARGET.arch, x86_64) {
-        MDK_BIN_DIR = $$join(MDK_BIN_DIR,,,64)
-        MDK_LIB_DIR = $$join(MDK_LIB_DIR,,,64)
-    } else {
-        MDK_BIN_DIR = $$join(MDK_BIN_DIR,,,86)
-        MDK_LIB_DIR = $$join(MDK_LIB_DIR,,,86)
+    MDK_ARCH = x64
+    contains(QT_ARCH, x.*64) {
+        android: MDK_ARCH = x86_64
+        else: MDK_ARCH = x64
+    } else: contains(QT_ARCH, .*86) {
+        MDK_ARCH = x86
+    } else: contains(QT_ARCH, a.*64) {
+        android: MDK_ARCH = arm64-v8a
+        else: MDK_ARCH = arm64
+    } else: contains(QT_ARCH, arm.*) {
+        android: MDK_ARCH = armeabi-v7a
+        else: MDK_ARCH = arm
     }
     INCLUDEPATH += $$MDK_SDK_DIR/include
     LIBS += \
-        -L$$MDK_LIB_DIR \
+        -L$$[QT_INSTALL_LIBS] \
+        -L$$MDK_SDK_DIR/lib/$$MDK_ARCH \
         -lmdk
     mdk.path = $$[QT_INSTALL_BINS]
-    mdk.files = \
-        $$MDK_BIN_DIR/mdk.dll \
-        $$MDK_BIN_DIR/ffmpeg.dll
+    # TODO: Other platforms
+    win32: mdk.files = \
+        $$MDK_SDK_DIR/bin/$$MDK_ARCH/mdk.dll \
+        $$MDK_SDK_DIR/bin/$$MDK_ARCH/ffmpeg*.dll
     INSTALLS += mdk
 }
 

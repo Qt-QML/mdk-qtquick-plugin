@@ -33,6 +33,12 @@ class MdkDeclarativeObject : public QQuickFramebufferObject {
                    playbackRateChanged)
     Q_PROPERTY(float aspectRatio READ aspectRatio WRITE setAspectRatio NOTIFY
                    aspectRatioChanged)
+    Q_PROPERTY(QString snapshotDirectory READ snapshotDirectory WRITE
+                   setSnapshotDirectory NOTIFY snapshotDirectoryChanged)
+    Q_PROPERTY(QString snapshotFormat READ snapshotFormat WRITE
+                   setSnapshotFormat NOTIFY snapshotFormatChanged)
+    Q_PROPERTY(QString snapshotTemplate READ snapshotTemplate WRITE
+                   setSnapshotTemplate NOTIFY snapshotTemplateChanged)
 
 public:
     enum class PlaybackState { Stopped, Playing, Paused };
@@ -97,6 +103,15 @@ public:
     [[nodiscard]] float aspectRatio() const;
     void setAspectRatio(float value);
 
+    [[nodiscard]] QString snapshotDirectory() const;
+    void setSnapshotDirectory(const QString &value);
+
+    [[nodiscard]] QString snapshotFormat() const;
+    void setSnapshotFormat(const QString &value);
+
+    [[nodiscard]] QString snapshotTemplate() const;
+    void setSnapshotTemplate(const QString &value);
+
     Q_INVOKABLE void open(const QUrl &value);
     Q_INVOKABLE void play();
     Q_INVOKABLE void play(const QUrl &value);
@@ -105,6 +120,7 @@ public:
     Q_INVOKABLE void seek(qint64 value);
     Q_INVOKABLE void rotate(int value);
     Q_INVOKABLE void scale(float x, float y);
+    Q_INVOKABLE void snapshot();
 
 private:
     void processMdkEvents();
@@ -139,13 +155,19 @@ Q_SIGNALS:
     void logLevelChanged();
     void playbackRateChanged();
     void aspectRatioChanged();
+    void snapshotDirectoryChanged();
+    void snapshotFormatChanged();
+    void snapshotTemplateChanged();
 
 private:
     QUrl m_source = QUrl();
-    std::unique_ptr<mdk::Player> player;
+    std::unique_ptr<MDK_NS::Player> m_player;
     float m_volume = 1.0F;
-    bool m_mute = false, hasVideo = false, hasAudio = false;
-    QTimer timer;
+    bool m_mute = false, m_hasVideo = false, m_hasAudio = false,
+         m_hasSubtitle = false;
+    QTimer m_timer;
+    QString m_snapshotDirectory, m_snapshotFormat = QString::fromUtf8("png"),
+                                 m_snapshotTemplate = QString();
 };
 
 #endif

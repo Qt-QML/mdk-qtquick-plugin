@@ -26,27 +26,30 @@ private:
 };
 
 MdkDeclarativeObject::MdkDeclarativeObject(QQuickItem *parent)
-    : QQuickFramebufferObject(parent), player(std::make_unique<mdk::Player>()) {
-    Q_ASSERT(player != nullptr);
+    : QQuickFramebufferObject(parent),
+      m_player(std::make_unique<MDK_NS::Player>()),
+      m_snapshotDirectory(
+          QDir::toNativeSeparators(QCoreApplication::applicationDirPath())) {
+    Q_ASSERT(m_player != nullptr);
 #ifdef Q_OS_WINDOWS
-    player->setVideoDecoders({"MFT:d3d=11", "MFT:d3d=9", "MFT", "D3D11", "DXVA",
-                              "CUDA", "NVDEC", "FFmpeg"});
+    m_player->setVideoDecoders({"MFT:d3d=11", "MFT:d3d=9", "MFT", "D3D11",
+                                "DXVA", "CUDA", "NVDEC", "FFmpeg"});
 #elif defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
-    player->setVideoDecoders({"VAAPI", "VDPAU", "CUDA", "NVDEC", "FFmpeg"});
+    m_player->setVideoDecoders({"VAAPI", "VDPAU", "CUDA", "NVDEC", "FFmpeg"});
 #elif defined(Q_OS_MACOS)
-    player->setVideoDecoders({"VT", "VideoToolbox", "FFmpeg"});
+    m_player->setVideoDecoders({"VT", "VideoToolbox", "FFmpeg"});
 #endif
-    player->setRenderCallback([this](void * /*unused*/) {
+    m_player->setRenderCallback([this](void * /*unused*/) {
         QMetaObject::invokeMethod(this, "update");
     });
     // MUST set before setMedia() because setNextMedia() is called when media is
     // changed
-    player->setPreloadImmediately(false);
+    m_player->setPreloadImmediately(false);
     connect(this, &MdkDeclarativeObject::startWatchingProperties, this,
-            [this] { timer.start(500); });
+            [this] { m_timer.start(500); });
     connect(this, &MdkDeclarativeObject::stopWatchingProperties, this,
-            [this] { timer.stop(); });
-    connect(&timer, &QTimer::timeout, this, &MdkDeclarativeObject::notify);
+            [this] { m_timer.stop(); });
+    connect(&m_timer, &QTimer::timeout, this, &MdkDeclarativeObject::notify);
     connect(this, &MdkDeclarativeObject::sourceChanged, this,
             &MdkDeclarativeObject::fileNameChanged);
     connect(this, &MdkDeclarativeObject::sourceChanged, this,
@@ -59,10 +62,10 @@ MdkDeclarativeObject::createRenderer() const {
     return new MdkRenderer(const_cast<MdkDeclarativeObject *>(this));
 }
 
-void MdkDeclarativeObject::renderVideo() { player->renderVideo(); }
+void MdkDeclarativeObject::renderVideo() { m_player->renderVideo(); }
 
 void MdkDeclarativeObject::setVideoSurfaceSize(QSize size) {
-    player->setVideoSurfaceSize(size.width(), size.height());
+    m_player->setVideoSurfaceSize(size.width(), size.height());
 }
 
 QUrl MdkDeclarativeObject::source() const {
@@ -73,35 +76,40 @@ void MdkDeclarativeObject::setSource(const QUrl &value) {
     if (!value.isValid() || (value == m_source)) {
         return;
     }
-    player->setNextMedia(nullptr);
-    player->setState(mdk::PlaybackState::Stopped);
-    player->waitFor(mdk::PlaybackState::Stopped);
+    m_player->setNextMedia(nullptr);
+    m_player->setState(MDK_NS::PlaybackState::Stopped);
+    m_player->waitFor(MDK_NS::PlaybackState::Stopped);
     // 1st url may be the same as current url
-    player->setMedia(nullptr);
-    player->setMedia(value.isLocalFile() ? qPrintable(value.toLocalFile())
-                                         : qPrintable(value.url()));
+    m_player->setMedia(nullptr);
+    m_player->setMedia(
+        value.isLocalFile()
+            ? qUtf8Printable(QDir::toNativeSeparators(value.toLocalFile()))
+            : qUtf8Printable(value.url()));
     m_source = value;
     Q_EMIT sourceChanged();
-    player->scale(1.0F, -1.0F);
+    m_player->scale(1.0F, -1.0F);
     Q_EMIT positionChanged();
-    player->prepare(0, [this](int64_t position, bool * /*unused*/) {
+    m_player->prepare(0, [this](int64_t position, bool * /*unused*/) {
         Q_UNUSED(position)
-        const auto &info = player->mediaInfo();
-        hasVideo = !info.video.empty();
-        hasAudio = !info.audio.empty();
+        const auto &info = m_player->mediaInfo();
+        m_hasVideo = !info.video.empty();
+        m_hasAudio = !info.audio.empty();
+        // m_hasSubtitle = ...
         Q_EMIT durationChanged();
         Q_EMIT seekableChanged();
-        if (hasVideo) {
+        if (m_hasVideo) {
             Q_EMIT videoSizeChanged();
         }
+        return true;
     });
-    player->setState(mdk::PlaybackState::Playing);
+    m_player->setState(MDK_NS::PlaybackState::Playing);
 }
 
 QString MdkDeclarativeObject::fileName() const {
     return (isStopped() || !m_source.isValid())
         ? QString()
-        : (m_source.isLocalFile() ? m_source.fileName() : m_source.url());
+        : (m_source.isLocalFile() ? m_source.fileName()
+                                  : m_source.toDisplayString());
 }
 
 QString MdkDeclarativeObject::path() const {
@@ -109,11 +117,12 @@ QString MdkDeclarativeObject::path() const {
         ? QString()
         : (m_source.isLocalFile()
                ? QDir::toNativeSeparators(m_source.toLocalFile())
-               : m_source.url());
+               : m_source.toDisplayString());
 }
 
 qint64 MdkDeclarativeObject::position() const {
-    return isStopped() ? 0 : qBound(qint64(0), player->position(), duration());
+    return isStopped() ? 0
+                       : qBound(qint64(0), m_player->position(), duration());
 }
 
 void MdkDeclarativeObject::setPosition(qint64 value) {
@@ -124,14 +133,14 @@ void MdkDeclarativeObject::setPosition(qint64 value) {
 }
 
 qint64 MdkDeclarativeObject::duration() const {
-    return isStopped() ? 0 : qMax(player->mediaInfo().duration, qint64(0));
+    return isStopped() ? 0 : qMax(m_player->mediaInfo().duration, qint64(0));
 }
 
 QSize MdkDeclarativeObject::videoSize() const {
-    return (isStopped() || !hasVideo)
+    return (isStopped() || !m_hasVideo)
         ? QSize(0, 0)
-        : QSize(qMax(player->mediaInfo().video.at(0).codec.width, 0),
-                qMax(player->mediaInfo().video.at(0).codec.height, 0));
+        : QSize(qMax(m_player->mediaInfo().video.at(0).codec.width, 0),
+                qMax(m_player->mediaInfo().video.at(0).codec.height, 0));
 }
 
 float MdkDeclarativeObject::volume() const {
@@ -142,7 +151,7 @@ void MdkDeclarativeObject::setVolume(float value) {
     if (value == volume()) {
         return;
     }
-    player->setVolume(qBound(0.0F, value, 1.0F));
+    m_player->setVolume(qBound(0.0F, value, 1.0F));
     m_volume = value;
     Q_EMIT volumeChanged();
 }
@@ -153,24 +162,26 @@ void MdkDeclarativeObject::setMute(bool value) {
     if (value == mute()) {
         return;
     }
-    player->setMute(value);
+    m_player->setMute(value);
     m_mute = value;
     Q_EMIT muteChanged();
 }
 
-bool MdkDeclarativeObject::seekable() const { return true; }
+bool MdkDeclarativeObject::seekable() const {
+    // Local files are always seekable, in theory.
+    return true;
+}
 
 MdkDeclarativeObject::PlaybackState
 MdkDeclarativeObject::playbackState() const {
-    switch (player->state()) {
-    case mdk::PlaybackState::Playing:
+    switch (m_player->state()) {
+    case MDK_NS::PlaybackState::Playing:
         return PlaybackState::Playing;
-    case mdk::PlaybackState::Paused:
+    case MDK_NS::PlaybackState::Paused:
         return PlaybackState::Paused;
-    case mdk::PlaybackState::Stopped:
+    case MDK_NS::PlaybackState::Stopped:
         return PlaybackState::Stopped;
     }
-    return PlaybackState::Stopped;
 }
 
 void MdkDeclarativeObject::setPlaybackState(
@@ -180,34 +191,34 @@ void MdkDeclarativeObject::setPlaybackState(
     }
     switch (value) {
     case PlaybackState::Playing:
-        player->setState(mdk::PlaybackState::Playing);
+        m_player->setState(MDK_NS::PlaybackState::Playing);
         break;
     case PlaybackState::Paused:
-        player->setState(mdk::PlaybackState::Paused);
+        m_player->setState(MDK_NS::PlaybackState::Paused);
         break;
     case PlaybackState::Stopped:
-        player->setState(mdk::PlaybackState::Stopped);
+        m_player->setState(MDK_NS::PlaybackState::Stopped);
         break;
     }
 }
 
 MdkDeclarativeObject::MediaStatus MdkDeclarativeObject::mediaStatus() const {
-    switch (player->mediaStatus()) {
-    case mdk::MediaStatus::NoMedia:
+    switch (m_player->mediaStatus()) {
+    case MDK_NS::MediaStatus::NoMedia:
         return MediaStatus::NoMedia;
-    case mdk::MediaStatus::Loading:
+    case MDK_NS::MediaStatus::Loading:
         return MediaStatus::Loading;
-    case mdk::MediaStatus::Loaded:
+    case MDK_NS::MediaStatus::Loaded:
         return MediaStatus::Loaded;
-    case mdk::MediaStatus::Stalled:
+    case MDK_NS::MediaStatus::Stalled:
         return MediaStatus::Stalled;
-    case mdk::MediaStatus::Buffering:
+    case MDK_NS::MediaStatus::Buffering:
         return MediaStatus::Buffering;
-    case mdk::MediaStatus::Buffered:
+    case MDK_NS::MediaStatus::Buffered:
         return MediaStatus::Buffered;
-    case mdk::MediaStatus::End:
+    case MDK_NS::MediaStatus::End:
         return MediaStatus::End;
-    case mdk::MediaStatus::Invalid:
+    case MDK_NS::MediaStatus::Invalid:
         return MediaStatus::Invalid;
     default:
         return MediaStatus::Unknown;
@@ -215,16 +226,16 @@ MdkDeclarativeObject::MediaStatus MdkDeclarativeObject::mediaStatus() const {
 }
 
 MdkDeclarativeObject::LogLevel MdkDeclarativeObject::logLevel() const {
-    switch (mdk::logLevel()) {
-    case mdk::LogLevel::Off:
+    switch (MDK_NS::logLevel()) {
+    case MDK_NS::LogLevel::Off:
         return LogLevel::Off;
-    case mdk::LogLevel::Debug:
+    case MDK_NS::LogLevel::Debug:
         return LogLevel::Debug;
-    case mdk::LogLevel::Warning:
+    case MDK_NS::LogLevel::Warning:
         return LogLevel::Warning;
-    case mdk::LogLevel::Error:
+    case MDK_NS::LogLevel::Error:
         return LogLevel::Critical;
-    case mdk::LogLevel::Info:
+    case MDK_NS::LogLevel::Info:
         return LogLevel::Info;
     default:
         return LogLevel::Debug;
@@ -237,34 +248,34 @@ void MdkDeclarativeObject::setLogLevel(MdkDeclarativeObject::LogLevel value) {
     }
     switch (value) {
     case LogLevel::Off:
-        mdk::setLogLevel(mdk::LogLevel::Off);
+        MDK_NS::setLogLevel(MDK_NS::LogLevel::Off);
         break;
     case LogLevel::Debug:
-        mdk::setLogLevel(mdk::LogLevel::Debug);
+        MDK_NS::setLogLevel(MDK_NS::LogLevel::Debug);
         break;
     case LogLevel::Warning:
-        mdk::setLogLevel(mdk::LogLevel::Warning);
+        MDK_NS::setLogLevel(MDK_NS::LogLevel::Warning);
         break;
     case LogLevel::Critical:
     case LogLevel::Fatal:
-        mdk::setLogLevel(mdk::LogLevel::Error);
+        MDK_NS::setLogLevel(MDK_NS::LogLevel::Error);
         break;
     case LogLevel::Info:
-        mdk::setLogLevel(mdk::LogLevel::Info);
+        MDK_NS::setLogLevel(MDK_NS::LogLevel::Info);
         break;
     }
     Q_EMIT logLevelChanged();
 }
 
 float MdkDeclarativeObject::playbackRate() const {
-    return isStopped() ? 0.0F : qMax(player->playbackRate(), 0.0F);
+    return isStopped() ? 0.0F : qMax(m_player->playbackRate(), 0.0F);
 }
 
 void MdkDeclarativeObject::setPlaybackRate(float value) {
     if (isStopped()) {
         return;
     }
-    player->setPlaybackRate(qMax(value, 0.0F));
+    m_player->setPlaybackRate(qMax(value, 0.0F));
     Q_EMIT playbackRateChanged();
 }
 
@@ -276,8 +287,48 @@ void MdkDeclarativeObject::setAspectRatio(float value) {
     if (isStopped()) {
         return;
     }
-    player->setAspectRatio(qMax(value, 0.0F));
+    m_player->setAspectRatio(qMax(value, 0.0F));
     Q_EMIT aspectRatioChanged();
+}
+
+QString MdkDeclarativeObject::snapshotDirectory() const {
+    return QDir::toNativeSeparators(m_snapshotDirectory);
+}
+
+void MdkDeclarativeObject::setSnapshotDirectory(const QString &value) {
+    if (value.isEmpty()) {
+        return;
+    }
+    const QString val = QDir::toNativeSeparators(value);
+    if (val == snapshotDirectory()) {
+        return;
+    }
+    m_snapshotDirectory = val;
+    Q_EMIT snapshotDirectoryChanged();
+}
+
+QString MdkDeclarativeObject::snapshotFormat() const {
+    return m_snapshotFormat;
+}
+
+void MdkDeclarativeObject::setSnapshotFormat(const QString &value) {
+    if (value.isEmpty() || (value == snapshotFormat())) {
+        return;
+    }
+    m_snapshotFormat = value;
+    Q_EMIT snapshotFormatChanged();
+}
+
+QString MdkDeclarativeObject::snapshotTemplate() const {
+    return m_snapshotTemplate;
+}
+
+void MdkDeclarativeObject::setSnapshotTemplate(const QString &value) {
+    if (value.isEmpty() || (value == snapshotTemplate())) {
+        return;
+    }
+    m_snapshotTemplate = value;
+    Q_EMIT snapshotTemplateChanged();
 }
 
 void MdkDeclarativeObject::open(const QUrl &value) {
@@ -296,7 +347,7 @@ void MdkDeclarativeObject::play() {
     if (!isPaused() || !m_source.isValid()) {
         return;
     }
-    player->setState(mdk::PlaybackState::Playing);
+    m_player->setState(MDK_NS::PlaybackState::Playing);
 }
 
 void MdkDeclarativeObject::play(const QUrl &value) {
@@ -314,14 +365,14 @@ void MdkDeclarativeObject::pause() {
     if (!isPlaying()) {
         return;
     }
-    player->setState(mdk::PlaybackState::Paused);
+    m_player->setState(MDK_NS::PlaybackState::Paused);
 }
 
 void MdkDeclarativeObject::stop() {
     if (isStopped()) {
         return;
     }
-    player->setState(mdk::PlaybackState::Stopped);
+    m_player->setState(MDK_NS::PlaybackState::Stopped);
     m_source.clear();
 }
 
@@ -329,52 +380,68 @@ void MdkDeclarativeObject::seek(qint64 value) {
     if (isStopped() || (value == position())) {
         return;
     }
-    player->seek(qBound(qint64(0), value, duration()));
+    m_player->seek(qBound(qint64(0), value, duration()));
 }
 
 void MdkDeclarativeObject::rotate(int value) {
     if (isStopped()) {
         return;
     }
-    player->rotate(qBound(0, value, 359));
+    m_player->rotate(qBound(0, value, 359));
 }
 
 void MdkDeclarativeObject::scale(float x, float y) {
     if (isStopped()) {
         return;
     }
-    player->scale(qMax(x, 0.0F), qMax(y, 0.0F));
+    m_player->scale(qMax(x, 0.0F), qMax(y, 0.0F));
+}
+
+void MdkDeclarativeObject::snapshot() {
+    if (isStopped()) {
+        return;
+    }
+    MDK_NS::Player::SnapshotRequest snapshotRequest{};
+    m_player->snapshot(
+        &snapshotRequest,
+        [this](MDK_NS::Player::SnapshotRequest *ret, double frameTime) {
+            Q_UNUSED(ret)
+            const QString str = snapshotDirectory() + QDir::separator() +
+                QString::number(frameTime) + u'.' + snapshotFormat();
+            qDebug().noquote() << "Taking snapshot:" << str;
+            return str.toStdString();
+        });
 }
 
 void MdkDeclarativeObject::processMdkEvents() {
-    mdk::setLogHandler([](mdk::LogLevel level, const char *msg) {
-        if (level >=
-            std::underlying_type<mdk::LogLevel>::type(mdk::LogLevel::Info)) {
+    MDK_NS::setLogHandler([](MDK_NS::LogLevel level, const char *msg) {
+        if (level >= std::underlying_type<MDK_NS::LogLevel>::type(
+                         MDK_NS::LogLevel::Info)) {
             qDebug().noquote() << msg;
-        } else if (level >= std::underlying_type<mdk::LogLevel>::type(
-                                mdk::LogLevel::Warning)) {
+        } else if (level >= std::underlying_type<MDK_NS::LogLevel>::type(
+                                MDK_NS::LogLevel::Warning)) {
             qWarning().noquote() << msg;
         }
     });
-    player->currentMediaChanged([this] {
-        qDebug().noquote() << "Current media changed:" << player->url();
+    m_player->currentMediaChanged([this] {
+        qDebug().noquote() << "Current media changed:" << m_player->url();
         Q_EMIT sourceChanged();
     });
-    player->onMediaStatusChanged([this](mdk::MediaStatus s) {
+    m_player->onMediaStatusChanged([this](MDK_NS::MediaStatus s) {
         Q_UNUSED(s)
         Q_EMIT mediaStatusChanged();
         return true;
     });
-    player->onEvent([](const mdk::MediaEvent &e) {
+    m_player->onEvent([](const MDK_NS::MediaEvent &e) {
         qDebug().noquote() << "Media event:" << e.category.data()
                            << e.detail.data();
         return false;
     });
-    player->onLoop([](int count) {
+    m_player->onLoop([](int count) {
         qDebug().noquote() << "onLoop:" << count;
         return false;
     });
-    player->onStateChanged([this](mdk::PlaybackState s) {
+    m_player->onStateChanged([this](MDK_NS::PlaybackState s) {
         Q_UNUSED(s)
         Q_EMIT playbackStateChanged();
         if (isPlaying()) {
@@ -397,13 +464,13 @@ void MdkDeclarativeObject::notify() { Q_EMIT positionChanged(); }
 bool MdkDeclarativeObject::isLoaded() const { return true; }
 
 bool MdkDeclarativeObject::isPlaying() const {
-    return player->state() == mdk::PlaybackState::Playing;
+    return m_player->state() == MDK_NS::PlaybackState::Playing;
 }
 
 bool MdkDeclarativeObject::isPaused() const {
-    return player->state() == mdk::PlaybackState::Paused;
+    return m_player->state() == MDK_NS::PlaybackState::Paused;
 }
 
 bool MdkDeclarativeObject::isStopped() const {
-    return player->state() == mdk::PlaybackState::Stopped;
+    return m_player->state() == MDK_NS::PlaybackState::Stopped;
 }
