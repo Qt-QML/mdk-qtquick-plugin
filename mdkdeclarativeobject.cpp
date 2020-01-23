@@ -406,10 +406,12 @@ void MdkDeclarativeObject::snapshot() {
         &snapshotRequest,
         [this](MDK_NS::Player::SnapshotRequest *ret, double frameTime) {
             Q_UNUSED(ret)
-            const QString str = snapshotDirectory() + QDir::separator() +
-                QString::number(frameTime) + u'.' + snapshotFormat();
-            qDebug().noquote() << "Taking snapshot:" << str;
-            return str.toStdString();
+            const QString path =
+                QString::fromUtf8("%1%2%3.%4")
+                    .arg(snapshotDirectory(), QDir::separator(),
+                         QString::number(frameTime), snapshotFormat());
+            qDebug().noquote() << "Taking snapshot:" << path;
+            return path.toStdString();
         });
 }
 
