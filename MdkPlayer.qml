@@ -18,6 +18,9 @@ Item {
     property alias logLevel: mdkObject.logLevel
     property alias playbackRate: mdkObject.playbackRate
     property alias aspectRatio: mdkObject.aspectRatio
+    property alias snapshotDirectory: mdkObject.snapshotDirectory
+    property alias snapshotFormat: mdkObject.snapshotFormat
+    property alias snapshotTemplate: mdkObject.snapshotTemplate
 
     signal loaded
     signal playing
@@ -44,6 +47,9 @@ Item {
     }
     function scale(x, y) {
         mdkObject.scale(x, y);
+    }
+    function snapshot() {
+        mdkObject.snapshot();
     }
     function isPlaying() {
         return mdkObject.playbackState === MdkObject.Playing;

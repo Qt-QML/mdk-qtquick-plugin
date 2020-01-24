@@ -61,17 +61,15 @@ Module {
         Property { name: "logLevel"; type: "MdkDeclarativeObject::LogLevel" }
         Property { name: "playbackRate"; type: "float" }
         Property { name: "aspectRatio"; type: "float" }
+        Property { name: "snapshotDirectory"; type: "string" }
+        Property { name: "snapshotFormat"; type: "string" }
+        Property { name: "snapshotTemplate"; type: "string" }
         Signal { name: "startWatchingProperties" }
         Signal { name: "stopWatchingProperties" }
         Signal { name: "loaded" }
         Signal { name: "playing" }
         Signal { name: "paused" }
         Signal { name: "stopped" }
-        Method { name: "renderVideo" }
-        Method {
-            name: "setVideoSurfaceSize"
-            Parameter { name: "size"; type: "QSize" }
-        }
         Method {
             name: "open"
             Parameter { name: "value"; type: "QUrl" }
@@ -96,6 +94,7 @@ Module {
             Parameter { name: "x"; type: "float" }
             Parameter { name: "y"; type: "float" }
         }
+        Method { name: "snapshot" }
     }
     Component {
         name: "QQuickFramebufferObject"

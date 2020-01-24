@@ -148,7 +148,7 @@ float MdkDeclarativeObject::volume() const {
 }
 
 void MdkDeclarativeObject::setVolume(float value) {
-    if (value == volume()) {
+    if (qFuzzyCompare(value, volume())) {
         return;
     }
     m_player->setVolume(qBound(0.0F, value, 1.0F));
@@ -182,6 +182,7 @@ MdkDeclarativeObject::playbackState() const {
     case MDK_NS::PlaybackState::Stopped:
         return PlaybackState::Stopped;
     }
+    return PlaybackState::Stopped;
 }
 
 void MdkDeclarativeObject::setPlaybackState(
