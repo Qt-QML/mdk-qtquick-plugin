@@ -166,7 +166,7 @@ private:
     bool m_mute = false, m_hasVideo = false, m_hasAudio = false,
          m_hasSubtitle = false;
     QTimer m_timer;
-    QString m_snapshotDirectory, m_snapshotFormat = QString::fromUtf8("png"),
+    QString m_snapshotDirectory, m_snapshotFormat = QLatin1String("png"),
                                  m_snapshotTemplate = QString();
 };
 
