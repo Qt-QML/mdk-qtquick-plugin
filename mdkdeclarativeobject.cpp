@@ -76,7 +76,7 @@ void MdkDeclarativeObject::setSource(const QUrl &value) {
     if (!value.isValid() || (value == m_source)) {
         return;
     }
-    m_player->setNextMedia(nullptr);
+    m_player->setNextMedia(nullptr, -1);
     m_player->setState(MDK_NS::PlaybackState::Stopped);
     m_player->waitFor(MDK_NS::PlaybackState::Stopped);
     // 1st url may be the same as current url
