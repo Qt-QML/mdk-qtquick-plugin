@@ -408,7 +408,7 @@ void MdkDeclarativeObject::snapshot() {
         [this](MDK_NS::Player::SnapshotRequest *ret, double frameTime) {
             Q_UNUSED(ret)
             const QString path =
-                QLatin1String("%1%2%3.%4")
+                QString::fromUtf8("%1%2%3.%4")
                     .arg(snapshotDirectory(), QDir::separator(),
                          QString::number(frameTime), snapshotFormat());
             qDebug().noquote() << "Taking snapshot:" << path;
