@@ -45,15 +45,11 @@ MdkDeclarativeObject::MdkDeclarativeObject(QQuickItem *parent)
     // MUST set before setMedia() because setNextMedia() is called when media is
     // changed
     m_player->setPreloadImmediately(false);
-    connect(this, &MdkDeclarativeObject::startWatchingProperties, this,
-            [this] { m_timer.start(500); });
-    connect(this, &MdkDeclarativeObject::stopWatchingProperties, this,
-            [this] { m_timer.stop(); });
-    connect(&m_timer, &QTimer::timeout, this, &MdkDeclarativeObject::notify);
     connect(this, &MdkDeclarativeObject::sourceChanged, this,
             &MdkDeclarativeObject::fileNameChanged);
     connect(this, &MdkDeclarativeObject::sourceChanged, this,
             &MdkDeclarativeObject::pathChanged);
+    startTimer(50);
     processMdkEvents();
 }
 
@@ -143,15 +139,15 @@ QSize MdkDeclarativeObject::videoSize() const {
                 qMax(m_player->mediaInfo().video.at(0).codec.height, 0));
 }
 
-float MdkDeclarativeObject::volume() const {
-    return qBound(0.0F, m_volume, 1.0F);
+qreal MdkDeclarativeObject::volume() const {
+    return qBound(0.0, m_volume, 1.0);
 }
 
-void MdkDeclarativeObject::setVolume(float value) {
+void MdkDeclarativeObject::setVolume(qreal value) {
     if (qFuzzyCompare(value, volume())) {
         return;
     }
-    m_player->setVolume(qBound(0.0F, value, 1.0F));
+    m_player->setVolume(qBound(0.0, value, 1.0));
     m_volume = value;
     Q_EMIT volumeChanged();
 }
@@ -268,27 +264,27 @@ void MdkDeclarativeObject::setLogLevel(MdkDeclarativeObject::LogLevel value) {
     Q_EMIT logLevelChanged();
 }
 
-float MdkDeclarativeObject::playbackRate() const {
+qreal MdkDeclarativeObject::playbackRate() const {
     return isStopped() ? 0.0F : qMax(m_player->playbackRate(), 0.0F);
 }
 
-void MdkDeclarativeObject::setPlaybackRate(float value) {
+void MdkDeclarativeObject::setPlaybackRate(qreal value) {
     if (isStopped()) {
         return;
     }
-    m_player->setPlaybackRate(qMax(value, 0.0F));
+    m_player->setPlaybackRate(qMax(value, 0.0));
     Q_EMIT playbackRateChanged();
 }
 
-float MdkDeclarativeObject::aspectRatio() const {
+qreal MdkDeclarativeObject::aspectRatio() const {
     return 1.7777F; // 16:9
 }
 
-void MdkDeclarativeObject::setAspectRatio(float value) {
+void MdkDeclarativeObject::setAspectRatio(qreal value) {
     if (isStopped()) {
         return;
     }
-    m_player->setAspectRatio(qMax(value, 0.0F));
+    m_player->setAspectRatio(qMax(value, 0.0));
     Q_EMIT aspectRatioChanged();
 }
 
@@ -391,11 +387,11 @@ void MdkDeclarativeObject::rotate(int value) {
     m_player->rotate(qBound(0, value, 359));
 }
 
-void MdkDeclarativeObject::scale(float x, float y) {
+void MdkDeclarativeObject::scale(qreal x, qreal y) {
     if (isStopped()) {
         return;
     }
-    m_player->scale(qMax(x, 0.0F), qMax(y, 0.0F));
+    m_player->scale(qMax(x, 0.0), qMax(y, 0.0));
 }
 
 void MdkDeclarativeObject::snapshot() {
@@ -414,6 +410,11 @@ void MdkDeclarativeObject::snapshot() {
             qDebug().noquote() << "Taking snapshot:" << path;
             return path.toStdString();
         });
+}
+
+void MdkDeclarativeObject::timerEvent(QTimerEvent *event) {
+    Q_UNUSED(event)
+    Q_EMIT positionChanged();
 }
 
 void MdkDeclarativeObject::processMdkEvents() {
@@ -448,21 +449,16 @@ void MdkDeclarativeObject::processMdkEvents() {
         Q_UNUSED(s)
         Q_EMIT playbackStateChanged();
         if (isPlaying()) {
-            Q_EMIT startWatchingProperties();
             Q_EMIT playing();
         }
         if (isPaused()) {
-            Q_EMIT stopWatchingProperties();
             Q_EMIT paused();
         }
         if (isStopped()) {
-            Q_EMIT stopWatchingProperties();
             Q_EMIT stopped();
         }
     });
 }
-
-void MdkDeclarativeObject::notify() { Q_EMIT positionChanged(); }
 
 bool MdkDeclarativeObject::isLoaded() const { return true; }
 

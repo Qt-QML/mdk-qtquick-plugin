@@ -1,4 +1,4 @@
-import QtQuick 2.13
+import QtQuick 2.14
 import wangwenx190.QuickMdk 1.0
 
 Item {

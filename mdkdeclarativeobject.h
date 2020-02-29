@@ -19,7 +19,7 @@ class MdkDeclarativeObject : public QQuickFramebufferObject {
         qint64 position READ position WRITE setPosition NOTIFY positionChanged)
     Q_PROPERTY(qint64 duration READ duration NOTIFY durationChanged)
     Q_PROPERTY(QSize videoSize READ videoSize NOTIFY videoSizeChanged)
-    Q_PROPERTY(float volume READ volume WRITE setVolume NOTIFY volumeChanged)
+    Q_PROPERTY(qreal volume READ volume WRITE setVolume NOTIFY volumeChanged)
     Q_PROPERTY(bool mute READ mute WRITE setMute NOTIFY muteChanged)
     Q_PROPERTY(bool seekable READ seekable NOTIFY seekableChanged)
     Q_PROPERTY(
@@ -29,9 +29,9 @@ class MdkDeclarativeObject : public QQuickFramebufferObject {
                    NOTIFY mediaStatusChanged)
     Q_PROPERTY(MdkDeclarativeObject::LogLevel logLevel READ logLevel WRITE
                    setLogLevel NOTIFY logLevelChanged)
-    Q_PROPERTY(float playbackRate READ playbackRate WRITE setPlaybackRate NOTIFY
+    Q_PROPERTY(qreal playbackRate READ playbackRate WRITE setPlaybackRate NOTIFY
                    playbackRateChanged)
-    Q_PROPERTY(float aspectRatio READ aspectRatio WRITE setAspectRatio NOTIFY
+    Q_PROPERTY(qreal aspectRatio READ aspectRatio WRITE setAspectRatio NOTIFY
                    aspectRatioChanged)
     Q_PROPERTY(QString snapshotDirectory READ snapshotDirectory WRITE
                    setSnapshotDirectory NOTIFY snapshotDirectoryChanged)
@@ -39,6 +39,8 @@ class MdkDeclarativeObject : public QQuickFramebufferObject {
                    setSnapshotFormat NOTIFY snapshotFormatChanged)
     Q_PROPERTY(QString snapshotTemplate READ snapshotTemplate WRITE
                    setSnapshotTemplate NOTIFY snapshotTemplateChanged)
+
+    QML_ELEMENT
 
 public:
     enum class PlaybackState { Stopped, Playing, Paused };
@@ -62,80 +64,80 @@ public:
 
     explicit MdkDeclarativeObject(QQuickItem *parent = nullptr);
 
-    [[nodiscard]] Renderer *createRenderer() const override;
+    Renderer *createRenderer() const override;
 
     void renderVideo();
     void setVideoSurfaceSize(QSize size);
 
-    [[nodiscard]] QUrl source() const;
+    QUrl source() const;
     void setSource(const QUrl &value);
 
-    [[nodiscard]] QString fileName() const;
+    QString fileName() const;
 
-    [[nodiscard]] QString path() const;
+    QString path() const;
 
-    [[nodiscard]] qint64 position() const;
+    qint64 position() const;
     void setPosition(qint64 value);
 
-    [[nodiscard]] qint64 duration() const;
+    qint64 duration() const;
 
-    [[nodiscard]] QSize videoSize() const;
+    QSize videoSize() const;
 
-    [[nodiscard]] float volume() const;
-    void setVolume(float value);
+    qreal volume() const;
+    void setVolume(qreal value);
 
-    [[nodiscard]] bool mute() const;
+    bool mute() const;
     void setMute(bool value);
 
-    [[nodiscard]] bool seekable() const;
+    bool seekable() const;
 
-    [[nodiscard]] MdkDeclarativeObject::PlaybackState playbackState() const;
+    MdkDeclarativeObject::PlaybackState playbackState() const;
     void setPlaybackState(MdkDeclarativeObject::PlaybackState value);
 
-    [[nodiscard]] MdkDeclarativeObject::MediaStatus mediaStatus() const;
+    MdkDeclarativeObject::MediaStatus mediaStatus() const;
 
-    [[nodiscard]] MdkDeclarativeObject::LogLevel logLevel() const;
+    MdkDeclarativeObject::LogLevel logLevel() const;
     void setLogLevel(MdkDeclarativeObject::LogLevel value);
 
-    [[nodiscard]] float playbackRate() const;
-    void setPlaybackRate(float value);
+    qreal playbackRate() const;
+    void setPlaybackRate(qreal value);
 
-    [[nodiscard]] float aspectRatio() const;
-    void setAspectRatio(float value);
+    qreal aspectRatio() const;
+    void setAspectRatio(qreal value);
 
-    [[nodiscard]] QString snapshotDirectory() const;
+    QString snapshotDirectory() const;
     void setSnapshotDirectory(const QString &value);
 
-    [[nodiscard]] QString snapshotFormat() const;
+    QString snapshotFormat() const;
     void setSnapshotFormat(const QString &value);
 
-    [[nodiscard]] QString snapshotTemplate() const;
+    QString snapshotTemplate() const;
     void setSnapshotTemplate(const QString &value);
 
-    Q_INVOKABLE void open(const QUrl &value);
-    Q_INVOKABLE void play();
-    Q_INVOKABLE void play(const QUrl &value);
-    Q_INVOKABLE void pause();
-    Q_INVOKABLE void stop();
-    Q_INVOKABLE void seek(qint64 value);
-    Q_INVOKABLE void rotate(int value);
-    Q_INVOKABLE void scale(float x, float y);
-    Q_INVOKABLE void snapshot();
+public Q_SLOTS:
+    void open(const QUrl &value);
+    void play();
+    void play(const QUrl &value);
+    void pause();
+    void stop();
+    void seek(qint64 value);
+    void rotate(int value);
+    void scale(qreal x, qreal y);
+    void snapshot();
+
+protected:
+    void timerEvent(QTimerEvent *event) override;
 
 private:
     void processMdkEvents();
-    void notify();
 
 private:
-    [[nodiscard]] bool isLoaded() const;
-    [[nodiscard]] bool isPlaying() const;
-    [[nodiscard]] bool isPaused() const;
-    [[nodiscard]] bool isStopped() const;
+    bool isLoaded() const;
+    bool isPlaying() const;
+    bool isPaused() const;
+    bool isStopped() const;
 
 Q_SIGNALS:
-    void startWatchingProperties();
-    void stopWatchingProperties();
-
     void loaded();
     void playing();
     void paused();
@@ -162,10 +164,9 @@ Q_SIGNALS:
 private:
     QUrl m_source = QUrl();
     std::unique_ptr<MDK_NS::Player> m_player;
-    float m_volume = 1.0F;
+    qreal m_volume = 1.0;
     bool m_mute = false, m_hasVideo = false, m_hasAudio = false,
          m_hasSubtitle = false;
-    QTimer m_timer;
     QString m_snapshotDirectory, m_snapshotFormat = QString::fromUtf8("png"),
                                  m_snapshotTemplate = QString();
 };

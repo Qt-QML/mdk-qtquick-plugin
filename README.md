@@ -49,7 +49,7 @@ MdkPlayer {
 
 Notes
 
-- `MdkPlayer` (defined in [*MdkPlayer.qml*](/MdkPlayer.qml)) is just a simple wrapper of the QML type `MdkObject` (defined in [*mdkdeclarativeobject.h*](/mdkdeclarativeobject.h) and [*mdkdeclarativeobject.cpp*](/mdkdeclarativeobject.cpp)). You can also use `MdkObject` directly if you want. It's usage is exactly the same with `MdkPlayer`.
+- `MdkPlayer` (defined in [*MdkPlayer.qml*](/imports/quickmdk/MdkPlayer.qml)) is just a simple wrapper of the QML type `MdkObject` (defined in [*mdkdeclarativeobject.h*](/mdkdeclarativeobject.h) and [*mdkdeclarativeobject.cpp*](/mdkdeclarativeobject.cpp)). You can also use `MdkObject` directly if you want. It's usage is exactly the same with `MdkPlayer`.
 - `mdkPlayer.duration`, `mdkPlayer.position` and `mdkPlayer.seek(position)` use **MILLISECONDS** instead of seconds.
 - `mdkPlayer.seek(position)` uses absolute position, not relative offset.
 - You can use `mdkPlayer.open(url)` to load and play *url* directly, it is equivalent to `mdkPlayer.source = url` (no need to call `mdkPlayer.play()` manually, because the playback will start immediately once the source url is changed).
@@ -57,7 +57,7 @@ Notes
 - To get the current playback state, use `mdkPlayer.isPlaying()`, `mdkPlayer.isPaused()` and `mdkPlayer.isStopped()`.
 - Qt will load the qml plugins automatically if you have installed them into their correct locations, you don't need to load them manually (and to be honest I don't know how to load them manually either).
 
-For more information, please refer to [*MdkPlayer.qml*](/MdkPlayer.qml).
+For more information, please refer to [*MdkPlayer.qml*](/imports/quickmdk/MdkPlayer.qml).
 
 ## Examples
 
@@ -65,7 +65,7 @@ For more information, please refer to [*MdkPlayer.qml*](/MdkPlayer.qml).
 
 ## Compilation
 
-Before doing anything else, I will assume you have already installed a widely-used modern C++ compiler (which means your compiler should support at least C++14), a not too old version of Qt and your Qt is configured successfully to use that compiler. All I want to say is that you should have a usable toolchain already. If not, please try to fix it yourself, that's not our topic here.
+Before doing anything else, please make sure you have a compiler that supports at least C++14 and a recent version of Qt.
 
 1. Checkout source code:
 
@@ -79,7 +79,7 @@ Before doing anything else, I will assume you have already installed a widely-us
 
    Download the official MDK SDK from: <https://sourceforge.net/projects/mdk-sdk/files/>. Then extract it to anywhere you like.
 
-   Once everything is ready, then write the following things to a text file named **user.conf** and save it to this repository's directory:
+   Once everything is ready, then write the following things to a text file named **.qmake.conf** and save it to this repository's directory:
 
    ```conf
    # You should replace the "D:/code/mdk-sdk" with your own path.
