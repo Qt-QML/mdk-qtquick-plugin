@@ -83,7 +83,7 @@ void MdkDeclarativeObject::setSource(const QUrl &value) {
             : qUtf8Printable(value.url()));
     m_source = value;
     Q_EMIT sourceChanged();
-    m_player->scale(1.0F, -1.0F);
+    m_player->scale(1.0, -1.0);
     Q_EMIT positionChanged();
     m_player->prepare(0, [this](int64_t position, bool * /*unused*/) {
         Q_UNUSED(position)
@@ -265,7 +265,7 @@ void MdkDeclarativeObject::setLogLevel(MdkDeclarativeObject::LogLevel value) {
 }
 
 qreal MdkDeclarativeObject::playbackRate() const {
-    return isStopped() ? 0.0F : qMax(m_player->playbackRate(), 0.0F);
+    return isStopped() ? 0.0 : qMax(m_player->playbackRate(), 0.0);
 }
 
 void MdkDeclarativeObject::setPlaybackRate(qreal value) {
@@ -277,7 +277,7 @@ void MdkDeclarativeObject::setPlaybackRate(qreal value) {
 }
 
 qreal MdkDeclarativeObject::aspectRatio() const {
-    return 1.7777F; // 16:9
+    return 1.7777; // 16:9
 }
 
 void MdkDeclarativeObject::setAspectRatio(qreal value) {

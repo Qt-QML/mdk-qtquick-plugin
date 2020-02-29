@@ -4,7 +4,6 @@
 #define _MDKDECLARATIVEOBJECT_H
 
 #include <QQuickFramebufferObject>
-#include <QTimer>
 #include <QUrl>
 #include <mdk/Player.h>
 #include <memory>
