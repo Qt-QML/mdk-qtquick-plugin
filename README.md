@@ -49,7 +49,7 @@ MdkPlayer {
 
 Notes
 
-- `MdkPlayer` (defined in [*MdkPlayer.qml*](/imports/quickmdk/MdkPlayer.qml)) is just a simple wrapper of the QML type `MdkObject` (defined in [*mdkdeclarativeobject.h*](/mdkdeclarativeobject.h) and [*mdkdeclarativeobject.cpp*](/mdkdeclarativeobject.cpp)). You can also use `MdkObject` directly if you want. It's usage is exactly the same with `MdkPlayer`.
+- `MdkPlayer` (defined in [*MdkPlayer.qml*](/imports/wangwenx190/QuickMdk/MdkPlayer.qml)) is just a simple wrapper of the QML type `MdkObject` (defined in [*mdkobject.h*](/mdkobject.h) and [*mdkobject.cpp*](/mdkobject.cpp)). You can also use `MdkObject` directly if you want. It's usage is exactly the same with `MdkPlayer`.
 - `mdkPlayer.duration`, `mdkPlayer.position` and `mdkPlayer.seek(position)` use **MILLISECONDS** instead of seconds.
 - `mdkPlayer.seek(position)` uses absolute position, not relative offset.
 - You can use `mdkPlayer.open(url)` to load and play *url* directly, it is equivalent to `mdkPlayer.source = url` (no need to call `mdkPlayer.play()` manually, because the playback will start immediately once the source url is changed).
@@ -57,7 +57,7 @@ Notes
 - To get the current playback state, use `mdkPlayer.isPlaying()`, `mdkPlayer.isPaused()` and `mdkPlayer.isStopped()`.
 - Qt will load the qml plugins automatically if you have installed them into their correct locations, you don't need to load them manually (and to be honest I don't know how to load them manually either).
 
-For more information, please refer to [*MdkPlayer.qml*](/imports/quickmdk/MdkPlayer.qml).
+For more information, please refer to [*MdkPlayer.qml*](/imports/wangwenx190/QuickMdk/MdkPlayer.qml).
 
 ## Examples
 
