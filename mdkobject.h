@@ -1,14 +1,11 @@
 #pragma once
 
-#ifndef _MDKDECLARATIVEOBJECT_H
-#define _MDKDECLARATIVEOBJECT_H
-
 #include <QQuickFramebufferObject>
 #include <QUrl>
 #include <mdk/Player.h>
 #include <memory>
 
-class MdkDeclarativeObject : public QQuickFramebufferObject {
+class MdkObject : public QQuickFramebufferObject {
     Q_OBJECT
 
     Q_PROPERTY(QUrl source READ source WRITE setSource NOTIFY sourceChanged)
@@ -21,13 +18,12 @@ class MdkDeclarativeObject : public QQuickFramebufferObject {
     Q_PROPERTY(qreal volume READ volume WRITE setVolume NOTIFY volumeChanged)
     Q_PROPERTY(bool mute READ mute WRITE setMute NOTIFY muteChanged)
     Q_PROPERTY(bool seekable READ seekable NOTIFY seekableChanged)
-    Q_PROPERTY(
-        MdkDeclarativeObject::PlaybackState playbackState READ playbackState
-            WRITE setPlaybackState NOTIFY playbackStateChanged)
-    Q_PROPERTY(MdkDeclarativeObject::MediaStatus mediaStatus READ mediaStatus
-                   NOTIFY mediaStatusChanged)
-    Q_PROPERTY(MdkDeclarativeObject::LogLevel logLevel READ logLevel WRITE
-                   setLogLevel NOTIFY logLevelChanged)
+    Q_PROPERTY(MdkObject::PlaybackState playbackState READ playbackState WRITE
+                   setPlaybackState NOTIFY playbackStateChanged)
+    Q_PROPERTY(MdkObject::MediaStatus mediaStatus READ mediaStatus NOTIFY
+                   mediaStatusChanged)
+    Q_PROPERTY(MdkObject::LogLevel logLevel READ logLevel WRITE setLogLevel
+                   NOTIFY logLevelChanged)
     Q_PROPERTY(qreal playbackRate READ playbackRate WRITE setPlaybackRate NOTIFY
                    playbackRateChanged)
     Q_PROPERTY(qreal aspectRatio READ aspectRatio WRITE setAspectRatio NOTIFY
@@ -39,6 +35,9 @@ class MdkDeclarativeObject : public QQuickFramebufferObject {
     Q_PROPERTY(QString snapshotTemplate READ snapshotTemplate WRITE
                    setSnapshotTemplate NOTIFY snapshotTemplateChanged)
 
+    // By default, the registered QML type's name is the class or namespace
+    // name, if you want to register a different name to the QML engine, use
+    // "QML_NAMED_ELEMENT(name)" instead.
     QML_ELEMENT
 
 public:
@@ -61,7 +60,7 @@ public:
     enum class LogLevel { Off, Debug, Warning, Critical, Fatal, Info };
     Q_ENUM(LogLevel)
 
-    explicit MdkDeclarativeObject(QQuickItem *parent = nullptr);
+    explicit MdkObject(QQuickItem *parent = nullptr);
 
     Renderer *createRenderer() const override;
 
@@ -90,13 +89,13 @@ public:
 
     bool seekable() const;
 
-    MdkDeclarativeObject::PlaybackState playbackState() const;
-    void setPlaybackState(MdkDeclarativeObject::PlaybackState value);
+    MdkObject::PlaybackState playbackState() const;
+    void setPlaybackState(MdkObject::PlaybackState value);
 
-    MdkDeclarativeObject::MediaStatus mediaStatus() const;
+    MdkObject::MediaStatus mediaStatus() const;
 
-    MdkDeclarativeObject::LogLevel logLevel() const;
-    void setLogLevel(MdkDeclarativeObject::LogLevel value);
+    MdkObject::LogLevel logLevel() const;
+    void setLogLevel(MdkObject::LogLevel value);
 
     qreal playbackRate() const;
     void setPlaybackRate(qreal value);
@@ -169,5 +168,3 @@ private:
     QString m_snapshotDirectory, m_snapshotFormat = QString::fromUtf8("png"),
                                  m_snapshotTemplate = QString();
 };
-
-#endif
