@@ -174,7 +174,7 @@ Before doing anything else, please make sure you have a compiler that supports a
 
       2. Enable the Qt attribute `Qt::AA_UseOpenGLES` for `Q(Core|Gui)Application`:
 
-         ```qt
+         ```cpp
          QCoreApplication::setAttribute(Qt::AA_UseOpenGLES);
          // or: QGuiApplication::setAttribute(Qt::AA_UseOpenGLES);
          ```
@@ -197,7 +197,7 @@ Before doing anything else, please make sure you have a compiler that supports a
    }
    ```
 
-   Note: For more log levels, please refer to [*MdkPlayer.qml*](/MdkPlayer.qml).
+   Note: For more log levels, please refer to [*MdkPlayer.qml*](/wangwenx190/QuickMdk/MdkPlayer.qml).
 - Why my application complaints about failed to create EGL context ... etc at startup and then crashed?
 
    ANGLE only supports OpenGL version <= 3.1. Please check whether you are using OpenGL newer than 3.1 through ANGLE or not.
@@ -206,7 +206,7 @@ Before doing anything else, please make sure you have a compiler that supports a
 
    Here is how to change the OpenGL version in Qt:
 
-   ```qt
+   ```cpp
    QSurfaceFormat surfaceFormat;
    // Here we use OpenGL version 4.6 for instance.
    // Don't use any versions newer than 3.1 if you are using ANGLE.
