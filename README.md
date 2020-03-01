@@ -197,7 +197,7 @@ Before doing anything else, please make sure you have a compiler that supports a
    }
    ```
 
-   Note: For more log levels, please refer to [*MdkPlayer.qml*](/wangwenx190/QuickMdk/MdkPlayer.qml).
+   Note: For more log levels, please refer to [*MdkPlayer.qml*](/imports/wangwenx190/QuickMdk/MdkPlayer.qml).
 - Why my application complaints about failed to create EGL context ... etc at startup and then crashed?
 
    ANGLE only supports OpenGL version <= 3.1. Please check whether you are using OpenGL newer than 3.1 through ANGLE or not.
