@@ -51,6 +51,8 @@ MdkObject::MdkObject(QQuickItem *parent)
     processMdkEvents();
 }
 
+MdkObject::~MdkObject() = default;
+
 QQuickFramebufferObject::Renderer *MdkObject::createRenderer() const {
     return new MdkRenderer(const_cast<MdkObject *>(this));
 }

@@ -10,7 +10,7 @@ win32: shared {
     CONFIG += skip_target_version_ext
 }
 isEmpty(MDK_SDK_DIR) {
-    error("You have to setup \"MDK_SDK_DIR\" in \"user.conf\" first!")
+    error(You have to setup \"MDK_SDK_DIR\" in \".qmake.conf\" first!)
 } else {
     MDK_ARCH = x64
     contains(QT_ARCH, x.*64) {

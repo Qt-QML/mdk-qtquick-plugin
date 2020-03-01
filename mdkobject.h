@@ -7,6 +7,7 @@
 
 class MdkObject : public QQuickFramebufferObject {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(MdkObject)
 
     Q_PROPERTY(QUrl source READ source WRITE setSource NOTIFY sourceChanged)
     Q_PROPERTY(QString fileName READ fileName NOTIFY fileNameChanged)
@@ -61,6 +62,7 @@ public:
     Q_ENUM(LogLevel)
 
     explicit MdkObject(QQuickItem *parent = nullptr);
+    ~MdkObject() override;
 
     Renderer *createRenderer() const override;
 
