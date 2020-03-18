@@ -99,50 +99,39 @@ void MdkObject::setSource(const QUrl &value) {
 }
 
 QString MdkObject::fileName() const {
-    return (isStopped() || !m_source.isValid())
-        ? QString()
-        : (m_source.isLocalFile() ? m_source.fileName()
-                                  : m_source.toDisplayString());
+    return m_source.isLocalFile() ? m_source.fileName()
+                                  : m_source.toDisplayString();
 }
 
 QString MdkObject::path() const {
-    return (isStopped() || !m_source.isValid())
-        ? QString()
-        : (m_source.isLocalFile()
-               ? QDir::toNativeSeparators(m_source.toLocalFile())
-               : m_source.toDisplayString());
+    return m_source.isLocalFile()
+        ? QDir::toNativeSeparators(m_source.toLocalFile())
+        : m_source.toDisplayString();
 }
 
-qint64 MdkObject::position() const {
-    return isStopped() ? 0
-                       : qBound(qint64(0), m_player->position(), duration());
-}
+qint64 MdkObject::position() const { return m_player->position(); }
 
 void MdkObject::setPosition(qint64 value) {
     if (isStopped() || (value == position())) {
         return;
     }
-    seek(qBound(qint64(0), value, duration()));
+    seek(value);
 }
 
-qint64 MdkObject::duration() const {
-    return isStopped() ? 0 : qMax(m_player->mediaInfo().duration, qint64(0));
-}
+qint64 MdkObject::duration() const { return m_player->mediaInfo().duration; }
 
 QSize MdkObject::videoSize() const {
-    return (isStopped() || !m_hasVideo)
-        ? QSize(0, 0)
-        : QSize(qMax(m_player->mediaInfo().video.at(0).codec.width, 0),
-                qMax(m_player->mediaInfo().video.at(0).codec.height, 0));
+    return QSize(m_player->mediaInfo().video.at(0).codec.width,
+                 m_player->mediaInfo().video.at(0).codec.height);
 }
 
-qreal MdkObject::volume() const { return qBound(0.0, m_volume, 1.0); }
+qreal MdkObject::volume() const { return m_volume; }
 
 void MdkObject::setVolume(qreal value) {
     if (qFuzzyCompare(value, volume())) {
         return;
     }
-    m_player->setVolume(qBound(0.0, value, 1.0));
+    m_player->setVolume(value);
     m_volume = value;
     Q_EMIT volumeChanged();
 }
@@ -258,28 +247,24 @@ void MdkObject::setLogLevel(MdkObject::LogLevel value) {
 }
 
 qreal MdkObject::playbackRate() const {
-    return isStopped()
-        ? 0.0
-        : qMax(static_cast<qreal>(m_player->playbackRate()), 0.0);
+    return static_cast<qreal>(m_player->playbackRate());
 }
 
 void MdkObject::setPlaybackRate(qreal value) {
     if (isStopped()) {
         return;
     }
-    m_player->setPlaybackRate(qMax(value, 0.0));
+    m_player->setPlaybackRate(value);
     Q_EMIT playbackRateChanged();
 }
 
-qreal MdkObject::aspectRatio() const {
-    return 1.7777; // 16:9
-}
+qreal MdkObject::aspectRatio() const { return (16.0 / 9.0); }
 
 void MdkObject::setAspectRatio(qreal value) {
     if (isStopped()) {
         return;
     }
-    m_player->setAspectRatio(qMax(value, 0.0));
+    m_player->setAspectRatio(value);
     Q_EMIT aspectRatioChanged();
 }
 
@@ -368,21 +353,21 @@ void MdkObject::seek(qint64 value) {
     if (isStopped() || (value == position())) {
         return;
     }
-    m_player->seek(qBound(qint64(0), value, duration()));
+    m_player->seek(value);
 }
 
 void MdkObject::rotate(int value) {
     if (isStopped()) {
         return;
     }
-    m_player->rotate(qBound(0, value, 359));
+    m_player->rotate(value);
 }
 
 void MdkObject::scale(qreal x, qreal y) {
     if (isStopped()) {
         return;
     }
-    m_player->scale(qMax(x, 0.0), qMax(y, 0.0));
+    m_player->scale(x, y);
 }
 
 void MdkObject::snapshot() {

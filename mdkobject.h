@@ -36,9 +36,6 @@ class MdkObject : public QQuickFramebufferObject {
     Q_PROPERTY(QString snapshotTemplate READ snapshotTemplate WRITE
                    setSnapshotTemplate NOTIFY snapshotTemplateChanged)
 
-    // By default, the registered QML type's name is the class or namespace
-    // name, if you want to register a different name to the QML engine, use
-    // "QML_NAMED_ELEMENT(name)" instead.
     QML_ELEMENT
 
 public:
