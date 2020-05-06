@@ -22,18 +22,24 @@ Once you have installed this plugin successfully, you can use it like any other 
 import QtQuick.Dialogs 1.3
 import wangwenx190.QuickMdk 1.0
 
+Shortcut {
+    sequence: StandardKey.Open
+    onActivated: fileDialog.open()
+}
+
 FileDialog {
     id: fileDialog
 
     title: qsTr("Please select a media file.")
     folder: shortcuts.movies
-    nameFilters: [qsTr("Video files (*.avi *.mkv* *.mp4)"), qsTr("Audio files (*.mp3 *.flac)"), qsTr("All files (*)")
+    nameFilters: [qsTr("Video files (*.avi *.mkv* *.mp4)"), qsTr("Audio files (*.mp3 *.flac)"), qsTr("All files (*)")]
 
     onAccepted: mdkPlayer.source = fileDialog.fileUrl
 }
 
 MdkPlayer {
     id: mdkPlayer
+    anchors.fill: parent
 
     source: "file:///D:/Videos/test.mkv" // playback will start immediately once the source url is changed
     logLevel: MdkObject.Debug
