@@ -8,29 +8,26 @@ class MdkRenderer : public QQuickFramebufferObject::Renderer {
     Q_DISABLE_COPY_MOVE(MdkRenderer)
 
 public:
-    MdkRenderer(MdkObject *mdkobject) : mdkobject(mdkobject) {
-        Q_ASSERT(this->mdkobject != nullptr);
-    }
+    MdkRenderer(MdkObject *obj) : m_mdkobject(obj) { Q_ASSERT(m_mdkobject); }
     ~MdkRenderer() override = default;
 
-    void render() override { mdkobject->renderVideo(); }
+    void render() override { m_mdkobject->renderVideo(); }
 
     QOpenGLFramebufferObject *
     createFramebufferObject(const QSize &size) override {
-        mdkobject->setVideoSurfaceSize(size);
+        m_mdkobject->setVideoSurfaceSize(size);
         return new QOpenGLFramebufferObject(size);
     }
 
 private:
-    MdkObject *mdkobject = nullptr;
+    MdkObject *m_mdkobject = nullptr;
 };
 
 MdkObject::MdkObject(QQuickItem *parent)
     : QQuickFramebufferObject(parent),
-      m_player(std::make_unique<MDK_NS::Player>()),
       m_snapshotDirectory(
           QDir::toNativeSeparators(QCoreApplication::applicationDirPath())) {
-    Q_ASSERT(m_player != nullptr);
+    Q_ASSERT(m_player);
 #ifdef Q_OS_WINDOWS
     m_player->setVideoDecoders({"MFT:d3d=11", "MFT:d3d=9", "MFT", "D3D11",
                                 "DXVA", "CUDA", "NVDEC", "FFmpeg"});
@@ -48,7 +45,7 @@ MdkObject::MdkObject(QQuickItem *parent)
     connect(this, &MdkObject::sourceChanged, this, &MdkObject::fileNameChanged);
     connect(this, &MdkObject::sourceChanged, this, &MdkObject::pathChanged);
     startTimer(50);
-    processMdkEvents();
+    initMdkHandlers();
 }
 
 MdkObject::~MdkObject() = default;
@@ -258,7 +255,7 @@ void MdkObject::setPlaybackRate(qreal value) {
     Q_EMIT playbackRateChanged();
 }
 
-qreal MdkObject::aspectRatio() const { return (16.0 / 9.0); }
+qreal MdkObject::aspectRatio() const { return static_cast<qreal>(16.0 / 9.0); }
 
 void MdkObject::setAspectRatio(qreal value) {
     if (isStopped()) {
@@ -393,7 +390,7 @@ void MdkObject::timerEvent(QTimerEvent *event) {
     Q_EMIT positionChanged();
 }
 
-void MdkObject::processMdkEvents() {
+void MdkObject::initMdkHandlers() {
     MDK_NS::setLogHandler([](MDK_NS::LogLevel level, const char *msg) {
         if (level >= std::underlying_type<MDK_NS::LogLevel>::type(
                          MDK_NS::LogLevel::Info)) {

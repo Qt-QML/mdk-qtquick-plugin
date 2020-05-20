@@ -3,10 +3,10 @@
 #include <QQuickFramebufferObject>
 #include <QUrl>
 #include <mdk/Player.h>
-#include <memory>
 
 class MdkObject : public QQuickFramebufferObject {
     Q_OBJECT
+    QML_ELEMENT
     Q_DISABLE_COPY_MOVE(MdkObject)
 
     Q_PROPERTY(QUrl source READ source WRITE setSource NOTIFY sourceChanged)
@@ -35,8 +35,6 @@ class MdkObject : public QQuickFramebufferObject {
                    setSnapshotFormat NOTIFY snapshotFormatChanged)
     Q_PROPERTY(QString snapshotTemplate READ snapshotTemplate WRITE
                    setSnapshotTemplate NOTIFY snapshotTemplateChanged)
-
-    QML_ELEMENT
 
 public:
     enum class PlaybackState { Stopped, Playing, Paused };
@@ -126,7 +124,7 @@ protected:
     void timerEvent(QTimerEvent *event) override;
 
 private:
-    void processMdkEvents();
+    void initMdkHandlers();
 
 private:
     bool isLoaded() const;
@@ -160,10 +158,11 @@ Q_SIGNALS:
 
 private:
     QUrl m_source = QUrl();
-    std::unique_ptr<MDK_NS::Player> m_player;
+    QScopedPointer<MDK_NS::Player> m_player{new MDK_NS::Player};
     qreal m_volume = 1.0;
     bool m_mute = false, m_hasVideo = false, m_hasAudio = false,
          m_hasSubtitle = false;
-    QString m_snapshotDirectory, m_snapshotFormat = QString::fromUtf8("png"),
-                                 m_snapshotTemplate = QString();
+    QString m_snapshotDirectory = QString(),
+            m_snapshotFormat = QString::fromUtf8("png"),
+            m_snapshotTemplate = QString();
 };

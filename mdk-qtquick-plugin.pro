@@ -27,6 +27,14 @@ isEmpty(MDK_SDK_DIR) {
     }
     INCLUDEPATH += $$MDK_SDK_DIR/include
     LIBS += -L$$MDK_SDK_DIR/lib/$$MDK_ARCH -lmdk
+    win32 {
+        libmdk.files = $$MDK_SDK_DIR/bin/$$MDK_ARCH/*.dll
+        libmdk.path = $$[QT_INSTALL_BINS]
+    } else: unix {
+        libmdk.files = $$MDK_SDK_DIR/bin/$$MDK_ARCH/*.so
+        libmdk.path = $$[QT_INSTALL_LIBS]
+    }
+    INSTALLS += libmdk
 }
 HEADERS += mdkobject.h
 SOURCES += mdkobject.cpp plugin.cpp
