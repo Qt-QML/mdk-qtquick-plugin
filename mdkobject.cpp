@@ -106,7 +106,9 @@ QString MdkObject::path() const {
         : m_source.toDisplayString();
 }
 
-qint64 MdkObject::position() const { return m_player->position(); }
+qint64 MdkObject::position() const {
+    return isStopped() ? 0 : m_player->position();
+}
 
 void MdkObject::setPosition(qint64 value) {
     if (isStopped() || (value == position())) {
@@ -115,11 +117,13 @@ void MdkObject::setPosition(qint64 value) {
     seek(value);
 }
 
-qint64 MdkObject::duration() const { return m_player->mediaInfo().duration; }
+qint64 MdkObject::duration() const {
+    return isStopped() ? 0 : m_player->mediaInfo().duration;
+}
 
 QSize MdkObject::videoSize() const {
-    return QSize(m_player->mediaInfo().video.at(0).codec.width,
-                 m_player->mediaInfo().video.at(0).codec.height);
+    const auto &codec = m_player->mediaInfo().video.at(0).codec;
+    return QSize(codec.width, codec.height);
 }
 
 qreal MdkObject::volume() const { return m_volume; }
@@ -244,7 +248,7 @@ void MdkObject::setLogLevel(MdkObject::LogLevel value) {
 }
 
 qreal MdkObject::playbackRate() const {
-    return static_cast<qreal>(m_player->playbackRate());
+    return isStopped() ? 1.0 : static_cast<qreal>(m_player->playbackRate());
 }
 
 void MdkObject::setPlaybackRate(qreal value) {
