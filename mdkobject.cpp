@@ -454,12 +454,22 @@ void MdkObject::timerEvent(QTimerEvent *event) {
 
 void MdkObject::initMdkHandlers() {
     MDK_NS::setLogHandler([](MDK_NS::LogLevel level, const char *msg) {
-        if (level >= std::underlying_type<MDK_NS::LogLevel>::type(
-                         MDK_NS::LogLevel::Info)) {
+        switch (level) {
+        case MDK_NS::LogLevel::Info:
+            qInfo().noquote() << msg;
+            break;
+        case MDK_NS::LogLevel::All:
+        case MDK_NS::LogLevel::Debug:
             qDebug().noquote() << msg;
-        } else if (level >= std::underlying_type<MDK_NS::LogLevel>::type(
-                                MDK_NS::LogLevel::Warning)) {
+            break;
+        case MDK_NS::LogLevel::Warning:
             qWarning().noquote() << msg;
+            break;
+        case MDK_NS::LogLevel::Error:
+            qCritical().noquote() << msg;
+            break;
+        default:
+            break;
         }
     });
     m_player->currentMediaChanged([this] {
