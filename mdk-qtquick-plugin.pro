@@ -1,6 +1,6 @@
 TARGET = $$qtLibraryTarget(mdkwrapperplugin)
 QT += quick
-CONFIG += c++17 strict_c++ warn_on rtti_off exceptions_off
+CONFIG += c++17 strict_c++ warn_on
 VERSION = 1.0.0.0
 win32: shared {
     QMAKE_TARGET_PRODUCT = "MdkDeclarativeWrapper"

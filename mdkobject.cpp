@@ -2,7 +2,31 @@
 
 #include <QDebug>
 #include <QDir>
+#include <QFileInfo>
+#include <QMimeDatabase>
+#include <QMimeType>
 #include <QOpenGLFramebufferObject>
+
+namespace {
+
+QStringList suffixesToMimeTypes(const QStringList &suffixes) {
+    QStringList mimeTypes{};
+    const QMimeDatabase db;
+    for (auto &&suffix : qAsConst(suffixes)) {
+        const QList<QMimeType> typeList = db.mimeTypesForFileName(suffix);
+        if (!typeList.isEmpty()) {
+            for (auto &&mimeType : qAsConst(typeList)) {
+                mimeTypes.append(mimeType.name());
+            }
+        }
+    }
+    if (!mimeTypes.isEmpty()) {
+        mimeTypes.removeDuplicates();
+    }
+    return mimeTypes;
+}
+
+} // namespace
 
 class MdkRenderer : public QQuickFramebufferObject::Renderer {
     Q_DISABLE_COPY_MOVE(MdkRenderer)
@@ -28,6 +52,8 @@ MdkObject::MdkObject(QQuickItem *parent)
       m_snapshotDirectory(
           QDir::toNativeSeparators(QCoreApplication::applicationDirPath())) {
     Q_ASSERT(m_player);
+    // Disable status messages as they are quite annoying.
+    qputenv("MDK_LOG_STATUS", "0");
 #ifdef Q_OS_WINDOWS
     m_player->setVideoDecoders({"MFT:d3d=11", "MFT:d3d=9", "MFT", "D3D11",
                                 "DXVA", "CUDA", "NVDEC", "FFmpeg"});
@@ -305,6 +331,14 @@ void MdkObject::setSnapshotTemplate(const QString &value) {
     Q_EMIT snapshotTemplateChanged();
 }
 
+QStringList MdkObject::videoMimeTypes() const {
+    return suffixesToMimeTypes(videoSuffixes());
+}
+
+QStringList MdkObject::audioMimeTypes() const {
+    return suffixesToMimeTypes(audioSuffixes());
+}
+
 void MdkObject::open(const QUrl &value) {
     if (!value.isValid()) {
         return;
@@ -389,6 +423,28 @@ void MdkObject::snapshot() {
         });
 }
 
+bool MdkObject::isVideo(const QUrl &value) const {
+    if (!value.isEmpty() && value.isValid()) {
+        return videoSuffixes().contains(
+            QString::fromUtf8("*.") + QFileInfo(value.fileName()).suffix(),
+            Qt::CaseInsensitive);
+    }
+    return false;
+}
+
+bool MdkObject::isAudio(const QUrl &value) const {
+    if (!value.isEmpty() && value.isValid()) {
+        return audioSuffixes().contains(
+            QString::fromUtf8("*.") + QFileInfo(value.fileName()).suffix(),
+            Qt::CaseInsensitive);
+    }
+    return false;
+}
+
+bool MdkObject::isMedia(const QUrl &value) const {
+    return (isVideo(value) || isAudio(value));
+}
+
 void MdkObject::timerEvent(QTimerEvent *event) {
     Q_UNUSED(event)
     Q_EMIT positionChanged();
@@ -437,7 +493,7 @@ void MdkObject::initMdkHandlers() {
     });
 }
 
-bool MdkObject::isLoaded() const { return true; }
+bool MdkObject::isLoaded() const { return !isStopped(); }
 
 bool MdkObject::isPlaying() const {
     return m_player->state() == MDK_NS::PlaybackState::Playing;
