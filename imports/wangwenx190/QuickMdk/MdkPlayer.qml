@@ -21,6 +21,13 @@ Item {
     property alias snapshotDirectory: mdkObject.snapshotDirectory
     property alias snapshotFormat: mdkObject.snapshotFormat
     property alias snapshotTemplate: mdkObject.snapshotTemplate
+    property alias videoSuffixes: mdkObject.videoSuffixes
+    property alias audioSuffixes: mdkObject.audioSuffixes
+    property alias subtitleSuffixes: mdkObject.subtitleSuffixes
+    property alias mediaSuffixes: mdkObject.mediaSuffixes
+    property alias videoMimeTypes: mdkObject.videoMimeTypes
+    property alias audioMimeTypes: mdkObject.audioMimeTypes
+    property alias mediaMimeTypes: mdkObject.mediaMimeTypes
 
     signal loaded
     signal playing
@@ -50,6 +57,15 @@ Item {
     }
     function snapshot() {
         mdkObject.snapshot();
+    }
+    function isVideo(url) {
+        return mdkObject.isVideo(url);
+    }
+    function isAudio(url) {
+        return mdkObject.isAudio(url);
+    }
+    function isMedia(url) {
+        return mdkObject.isMedia(url);
     }
     function isPlaying() {
         return mdkObject.playbackState === MdkObject.Playing;
