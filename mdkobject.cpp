@@ -89,7 +89,8 @@ void MdkObject::setVideoSurfaceSize(QSize size) {
 QUrl MdkObject::source() const { return isStopped() ? QUrl() : m_source; }
 
 void MdkObject::setSource(const QUrl &value) {
-    if (!value.isValid() || (value == m_source)) {
+    if (value.isEmpty() || !value.isValid() || (value == m_source) ||
+        !isMedia(value)) {
         return;
     }
     m_player->setNextMedia(nullptr, -1);
@@ -340,10 +341,10 @@ QStringList MdkObject::audioMimeTypes() const {
 }
 
 void MdkObject::open(const QUrl &value) {
-    if (!value.isValid()) {
+    if (value.isEmpty() || !value.isValid()) {
         return;
     }
-    if (value != m_source) {
+    if ((value != m_source) && isMedia(value)) {
         setSource(value);
     }
     if (!isPlaying()) {
@@ -359,12 +360,13 @@ void MdkObject::play() {
 }
 
 void MdkObject::play(const QUrl &value) {
-    if (!value.isValid()) {
+    if (value.isEmpty() || !value.isValid()) {
         return;
     }
     if ((value == m_source) && !isPlaying()) {
         play();
-    } else {
+    }
+    if ((value != m_source) && isMedia(value)) {
         open(value);
     }
 }
