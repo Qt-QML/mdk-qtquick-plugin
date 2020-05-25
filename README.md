@@ -32,7 +32,7 @@ FileDialog {
 
     title: qsTr("Please select a media file.")
     folder: shortcuts.movies
-    nameFilters: [qsTr("Video files (*.avi *.mkv* *.mp4)"), qsTr("Audio files (*.mp3 *.flac)"), qsTr("All files (*)")]
+    nameFilters: [qsTr("Video files (%1)").arg(mdkPlayer.videoSuffixes.join(' ')), qsTr("Audio files (%1)").arg(mdkPlayer.audioSuffixes.join(' ')), qsTr("All files (*)")]
 
     onAccepted: mdkPlayer.source = fileDialog.fileUrl
 }
