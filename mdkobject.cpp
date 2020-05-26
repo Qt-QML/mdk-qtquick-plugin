@@ -16,7 +16,10 @@ QStringList suffixesToMimeTypes(const QStringList &suffixes) {
         const QList<QMimeType> typeList = db.mimeTypesForFileName(suffix);
         if (!typeList.isEmpty()) {
             for (auto &&mimeType : qAsConst(typeList)) {
-                mimeTypes.append(mimeType.name());
+                const QString name = mimeType.name();
+                if (!name.isEmpty()) {
+                    mimeTypes.append(name);
+                }
             }
         }
     }
@@ -89,8 +92,7 @@ void MdkObject::setVideoSurfaceSize(QSize size) {
 QUrl MdkObject::source() const { return isStopped() ? QUrl() : m_source; }
 
 void MdkObject::setSource(const QUrl &value) {
-    if (value.isEmpty() || !value.isValid() || (value == m_source) ||
-        !isMedia(value)) {
+    if (!value.isValid() || (value == m_source) || !isMedia(value)) {
         return;
     }
     m_player->setNextMedia(nullptr, -1);
@@ -177,7 +179,7 @@ void MdkObject::setMute(bool value) {
 
 bool MdkObject::seekable() const {
     // Local files are always seekable, in theory.
-    return true;
+    return (isLoaded() && m_source.isLocalFile());
 }
 
 MdkObject::PlaybackState MdkObject::playbackState() const {
@@ -341,7 +343,7 @@ QStringList MdkObject::audioMimeTypes() const {
 }
 
 void MdkObject::open(const QUrl &value) {
-    if (value.isEmpty() || !value.isValid()) {
+    if (!value.isValid()) {
         return;
     }
     if ((value != m_source) && isMedia(value)) {
@@ -360,7 +362,7 @@ void MdkObject::play() {
 }
 
 void MdkObject::play(const QUrl &value) {
-    if (value.isEmpty() || !value.isValid()) {
+    if (!value.isValid()) {
         return;
     }
     if ((value == m_source) && !isPlaying()) {
@@ -384,6 +386,10 @@ void MdkObject::stop() {
     }
     m_player->setState(MDK_NS::PlaybackState::Stopped);
     m_source.clear();
+    Q_EMIT sourceChanged();
+    Q_EMIT positionChanged();
+    Q_EMIT durationChanged();
+    Q_EMIT seekableChanged();
 }
 
 void MdkObject::seek(qint64 value) {
@@ -426,7 +432,7 @@ void MdkObject::snapshot() {
 }
 
 bool MdkObject::isVideo(const QUrl &value) const {
-    if (!value.isEmpty() && value.isValid()) {
+    if (value.isValid()) {
         return videoSuffixes().contains(
             QString::fromUtf8("*.") + QFileInfo(value.fileName()).suffix(),
             Qt::CaseInsensitive);
@@ -435,7 +441,7 @@ bool MdkObject::isVideo(const QUrl &value) const {
 }
 
 bool MdkObject::isAudio(const QUrl &value) const {
-    if (!value.isEmpty() && value.isValid()) {
+    if (value.isValid()) {
         return audioSuffixes().contains(
             QString::fromUtf8("*.") + QFileInfo(value.fileName()).suffix(),
             Qt::CaseInsensitive);
