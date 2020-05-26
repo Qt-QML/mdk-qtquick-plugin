@@ -119,6 +119,7 @@ void MdkObject::setSource(const QUrl &value) {
         if (m_hasVideo) {
             Q_EMIT videoSizeChanged();
         }
+        Q_EMIT loaded();
         return true;
     });
     m_player->setState(MDK_NS::PlaybackState::Playing);
