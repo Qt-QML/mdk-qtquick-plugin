@@ -188,18 +188,14 @@ public:
             qDebug().noquote()
                 << "Got QSGTexture wrapper" << wrapper
                 << "for an OpenGL texture '" << tex << "' of size" << m_size;
-            // flip y
+            // Flip y.
             player->scale(1.0f, -1.0f);
 #endif
         } break;
-        case QSGRendererInterface::Software: {
-            // Mesa LLVM pipe: Software renderer, render everything through CPU.
-            // Very slow. For machines which don't have a GPU.
-        } break;
-        case QSGRendererInterface::NullRhi: {
-            // Null: No visual output.
-        } break;
         default:
+            qCritical().noquote()
+                << "QSGRendererInterface reports unknown graphics API:"
+                << rif->graphicsApi();
             break;
         }
         player->setVideoSurfaceSize(m_size.width(), m_size.height());
