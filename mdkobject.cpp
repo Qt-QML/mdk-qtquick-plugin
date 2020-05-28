@@ -258,7 +258,6 @@ MdkObject::MdkObject(QQuickItem *parent) : QQuickItem(parent) {
     qRegisterMetaType<ChapterInfo>();
     // Disable status messages as they are quite annoying.
     qputenv("MDK_LOG_STATUS", "0");
-#if 0
 #ifdef Q_OS_WINDOWS
     m_player->setVideoDecoders({"MFT:d3d=11", "MFT:d3d=9", "MFT", "D3D11",
                                 "DXVA", "CUDA", "NVDEC", "FFmpeg"});
@@ -266,7 +265,6 @@ MdkObject::MdkObject(QQuickItem *parent) : QQuickItem(parent) {
     m_player->setVideoDecoders({"VAAPI", "VDPAU", "CUDA", "NVDEC", "FFmpeg"});
 #elif defined(Q_OS_MACOS)
     m_player->setVideoDecoders({"VT", "VideoToolbox", "FFmpeg"});
-#endif
 #endif
     m_player->setRenderCallback(
         [this](void *) { QMetaObject::invokeMethod(this, "update"); });
