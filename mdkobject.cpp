@@ -1,11 +1,31 @@
 #include "mdkobject.h"
 
+#ifdef Q_OS_WINDOWS
+#include <d3d11.h>
+#include <wrl/client.h>
+#endif
+
+#ifdef Q_OS_MACOS
+#include <Metal/Metal.h>
+#endif
+
+#include "mdk/Player.h"
+#include "mdk/RenderAPI.h"
 #include <QDebug>
 #include <QDir>
 #include <QFileInfo>
 #include <QMimeDatabase>
 #include <QMimeType>
+#include <QQuickWindow>
+#include <QSGSimpleTextureNode>
+#include <QSGTextureProvider>
+#include <QScreen>
+#include <QTime>
+#include <QtMath>
+#if QT_CONFIG(opengl)
 #include <QOpenGLFramebufferObject>
+#include <QOpenGLFunctions>
+#endif
 
 namespace {
 
@@ -29,34 +49,215 @@ QStringList suffixesToMimeTypes(const QStringList &suffixes) {
     return mimeTypes;
 }
 
+QString timeToString(const qint64 ms) {
+    return QTime(0, 0).addMSecs(ms).toString(QString::fromUtf8("hh:mm:ss"));
+}
+
 } // namespace
 
-class MdkRenderer : public QQuickFramebufferObject::Renderer {
-    Q_DISABLE_COPY_MOVE(MdkRenderer)
+class VideoTextureNode : public QSGTextureProvider,
+                         public QSGSimpleTextureNode {
+    Q_OBJECT
+    Q_DISABLE_COPY_MOVE(VideoTextureNode)
 
 public:
-    MdkRenderer(MdkObject *obj) : m_mdkobject(obj) { Q_ASSERT(m_mdkobject); }
-    ~MdkRenderer() override = default;
+    explicit VideoTextureNode(MdkObject *item)
+        : m_item(item), m_player(item->m_player) {
+        Q_ASSERT(item && !m_player.isNull());
+        m_window = m_item->window();
+        Q_ASSERT(m_window);
+        connect(m_window, &QQuickWindow::beforeRendering, this,
+                &VideoTextureNode::render);
+        connect(m_window, &QQuickWindow::screenChanged, this,
+                [this](QScreen *screen) {
+                    Q_UNUSED(screen)
+                    if (m_window->effectiveDevicePixelRatio() != m_dpr) {
+                        m_item->update();
+                    }
+                });
+    }
 
-    void render() override { m_mdkobject->renderVideo(); }
+    ~VideoTextureNode() override {
+        // Release gfx resources.
+#if QT_CONFIG(opengl)
+        fbo_gl.reset();
+#endif
+        qDebug().noquote() << "Renderer destroyed.";
+    }
 
-    QOpenGLFramebufferObject *
-    createFramebufferObject(const QSize &size) override {
-        m_mdkobject->setVideoSurfaceSize(size);
-        return new QOpenGLFramebufferObject(size);
+    QSGTexture *texture() const override {
+        return QSGSimpleTextureNode::texture();
+    }
+
+    void sync() {
+        m_dpr = m_window->effectiveDevicePixelRatio();
+        const QSize newSize = m_window->size() * m_dpr;
+        bool needsNew = false;
+        if (!texture()) {
+            needsNew = true;
+        }
+        if (newSize != m_size) {
+            needsNew = true;
+            m_size = newSize;
+        }
+        if (!needsNew) {
+            return;
+        }
+        delete texture();
+        const auto player = m_player.lock();
+        if (!player) {
+            return;
+        }
+        QSGRendererInterface *rif = m_window->rendererInterface();
+        switch (rif->graphicsApi()) {
+        case QSGRendererInterface::Direct3D11Rhi: {
+            // Direct3D: Qt RHI's default backend on Windows. Not supported on
+            // all other platforms.
+#ifdef Q_OS_WINDOWS
+            auto dev = (ID3D11Device *)rif->getResource(
+                m_window, QSGRendererInterface::DeviceResource);
+            D3D11_TEXTURE2D_DESC desc = CD3D11_TEXTURE2D_DESC(
+                DXGI_FORMAT_R8G8B8A8_UNORM, m_size.width(), m_size.height(), 1,
+                1, D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET,
+                D3D11_USAGE_DEFAULT, 0, 1, 0, 0);
+            if (FAILED(
+                    dev->CreateTexture2D(&desc, nullptr, &m_texture_d3d11))) {
+                qCritical().noquote() << "Failed to create 2D texture!";
+            }
+            QSGTexture *wrapper = m_window->createTextureFromNativeObject(
+                QQuickWindow::NativeObjectTexture,
+                m_texture_d3d11.GetAddressOf(), 0, m_size);
+            setTexture(wrapper);
+            qDebug() << "Got QSGTexture wrapper" << wrapper
+                     << "for an D3D11 texture of size" << m_size;
+            MDK_NS::D3D11RenderAPI ra{};
+            Microsoft::WRL::ComPtr<ID3D11DeviceContext> ctx;
+            dev->GetImmediateContext(&ctx);
+            ra.context = ctx.Get();
+            dev->CreateRenderTargetView(m_texture_d3d11.Get(), nullptr, &m_rtv);
+            ra.rtv = m_rtv.Get();
+            player->setRenderAPI(&ra);
+#endif
+        } break;
+        case QSGRendererInterface::VulkanRhi: {
+            // Vulkan: Qt RHI's default backend on Linux (Android). Supported on
+            // Windows and macOS as well.
+        } break;
+        case QSGRendererInterface::MetalRhi: {
+            // Metal: Qt RHI's default backend on macOS. Not supported on all
+            // other platforms.
+#ifdef Q_OS_MACOS
+            auto dev = (__bridge id<MTLDevice>)rif->getResource(
+                m_window, QSGRendererInterface::DeviceResource);
+            Q_ASSERT(dev);
+            MTLTextureDescriptor *desc = [[MTLTextureDescriptor alloc] init];
+            desc.textureType = MTLTextureType2D;
+            desc.pixelFormat = MTLPixelFormatRGBA8Unorm;
+            desc.width = m_size.width();
+            desc.height = m_size.height();
+            desc.mipmapLevelCount = 1;
+            desc.resourceOptions = MTLResourceStorageModePrivate;
+            desc.storageMode = MTLStorageModePrivate;
+            desc.usage =
+                MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget;
+            m_texture_mtl = [dev newTextureWithDescriptor:desc];
+            QSGTexture *wrapper = m_window->createTextureFromNativeObject(
+                QQuickWindow::NativeObjectTexture, &m_texture_mtl, 0, m_size);
+            setTexture(wrapper);
+            qDebug().noquote() << "Got QSGTexture wrapper" << wrapper
+                               << "for an MTLTexture of size" << m_size;
+            MDK_NS::MetalRenderAPI ra{};
+            ra.texture = (__bridge void *)m_texture_mtl;
+            ra.device = (__bridge void *)dev;
+            ra.cmdQueue = rif->getResource(
+                m_window, QSGRendererInterface::CommandQueueResource);
+            player->setRenderAPI(&ra);
+#endif
+        } break;
+        case QSGRendererInterface::OpenGL:
+        case QSGRendererInterface::OpenGLRhi: {
+            // OpenGL: The legacy backend, to keep compatibility of Qt 5.
+            // Supported on all mainstream platforms.
+#if QT_CONFIG(opengl)
+            fbo_gl.reset(new QOpenGLFramebufferObject(m_size));
+            auto tex = fbo_gl->texture();
+            QSGTexture *wrapper = m_window->createTextureFromNativeObject(
+                QQuickWindow::NativeObjectTexture, &tex, 0, m_size);
+            setTexture(wrapper);
+            qDebug().noquote()
+                << "Got QSGTexture wrapper" << wrapper
+                << "for an OpenGL texture '" << tex << "' of size" << m_size;
+            // flip y
+            player->scale(1.0f, -1.0f);
+#endif
+        } break;
+        case QSGRendererInterface::Software: {
+            // Mesa LLVM pipe: Software renderer, render everything through CPU.
+            // Very slow. For machines which don't have a GPU.
+        } break;
+        case QSGRendererInterface::NullRhi: {
+            // Null: No visual output.
+        } break;
+        default:
+            break;
+        }
+        player->setVideoSurfaceSize(m_size.width(), m_size.height());
+    }
+
+private Q_SLOTS:
+    // This is hooked up to beforeRendering() so we can start our own render
+    // command encoder. If we instead wanted to use the scenegraph's render
+    // command encoder (targeting the window), it should be connected to
+    // beforeRenderPassRecording() instead.
+    void render() {
+#if QT_CONFIG(opengl)
+        GLuint prevFbo = 0;
+        if (fbo_gl) {
+            auto f = QOpenGLContext::currentContext()->functions();
+            f->glGetIntegerv(GL_FRAMEBUFFER_BINDING,
+                             reinterpret_cast<GLint *>(&prevFbo));
+            fbo_gl->bind();
+        }
+#endif
+        const auto player = m_player.lock();
+        if (!player) {
+            return;
+        }
+        player->renderVideo();
+#if QT_CONFIG(opengl)
+        if (fbo_gl) {
+            auto f = QOpenGLContext::currentContext()->functions();
+            f->glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
+        }
+#endif
     }
 
 private:
-    MdkObject *m_mdkobject = nullptr;
+    QQuickItem *m_item = nullptr;
+    QQuickWindow *m_window = nullptr;
+    QSize m_size = {};
+    qreal m_dpr = 1.0;
+#if QT_CONFIG(opengl)
+    QScopedPointer<QOpenGLFramebufferObject> fbo_gl;
+#endif
+    QWeakPointer<MDK_NS::Player> m_player;
+#ifdef Q_OS_WINDOWS
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> m_texture_d3d11;
+    Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_rtv;
+#endif
+#ifdef Q_OS_MACOS
+    id<MTLTexture> m_texture_mtl = nil;
+#endif
 };
 
-MdkObject::MdkObject(QQuickItem *parent)
-    : QQuickFramebufferObject(parent),
-      m_snapshotDirectory(
-          QDir::toNativeSeparators(QCoreApplication::applicationDirPath())) {
-    Q_ASSERT(m_player);
+MdkObject::MdkObject(QQuickItem *parent) : QQuickItem(parent) {
+    m_player.reset(new MDK_NS::Player);
+    Q_ASSERT(!m_player.isNull());
+    setFlag(ItemHasContents, true);
+    qRegisterMetaType<ChapterInfo>();
     // Disable status messages as they are quite annoying.
     qputenv("MDK_LOG_STATUS", "0");
+#if 0
 #ifdef Q_OS_WINDOWS
     m_player->setVideoDecoders({"MFT:d3d=11", "MFT:d3d=9", "MFT", "D3D11",
                                 "DXVA", "CUDA", "NVDEC", "FFmpeg"});
@@ -65,28 +266,60 @@ MdkObject::MdkObject(QQuickItem *parent)
 #elif defined(Q_OS_MACOS)
     m_player->setVideoDecoders({"VT", "VideoToolbox", "FFmpeg"});
 #endif
-    m_player->setRenderCallback([this](void * /*unused*/) {
-        QMetaObject::invokeMethod(this, "update");
-    });
+#endif
+    m_player->setRenderCallback(
+        [this](void *) { QMetaObject::invokeMethod(this, "update"); });
     // MUST set before setMedia() because setNextMedia() is called when media is
     // changed
     m_player->setPreloadImmediately(false);
+    m_snapshotDirectory =
+        QDir::toNativeSeparators(QCoreApplication::applicationDirPath());
     connect(this, &MdkObject::sourceChanged, this, &MdkObject::fileNameChanged);
     connect(this, &MdkObject::sourceChanged, this, &MdkObject::pathChanged);
-    startTimer(50);
+    connect(this, &MdkObject::positionChanged, this,
+            &MdkObject::positionTextChanged);
+    connect(this, &MdkObject::durationChanged, this,
+            &MdkObject::durationTextChanged);
     initMdkHandlers();
+    startTimer(50);
 }
 
 MdkObject::~MdkObject() = default;
 
-QQuickFramebufferObject::Renderer *MdkObject::createRenderer() const {
-    return new MdkRenderer(const_cast<MdkObject *>(this));
+// The beauty of using a true QSGNode: no need for complicated cleanup
+// arrangements, unlike in other examples like metalunderqml, because the
+// scenegraph will handle destroying the node at the appropriate time.
+// Called on the render thread when the scenegraph is invalidated.
+void MdkObject::invalidateSceneGraph() { m_node = nullptr; }
+
+// Called on the gui thread if the item is removed from scene.
+void MdkObject::releaseResources() { m_node = nullptr; }
+
+QSGNode *MdkObject::updatePaintNode(QSGNode *node, UpdatePaintNodeData *data) {
+    Q_UNUSED(data)
+    auto n = static_cast<VideoTextureNode *>(node);
+    if (!n && (width() <= 0 || height() <= 0)) {
+        return nullptr;
+    }
+    if (!n) {
+        m_node = new VideoTextureNode(this);
+        n = m_node;
+    }
+    m_node->sync();
+    n->setTextureCoordinatesTransform(QSGSimpleTextureNode::NoTransform);
+    n->setFiltering(QSGTexture::Linear);
+    n->setRect(0, 0, width(), height());
+    // Ensure getting to beforeRendering() at some point.
+    window()->update();
+    return n;
 }
 
-void MdkObject::renderVideo() { m_player->renderVideo(); }
-
-void MdkObject::setVideoSurfaceSize(QSize size) {
-    m_player->setVideoSurfaceSize(size.width(), size.height());
+void MdkObject::geometryChanged(const QRectF &newGeometry,
+                                const QRectF &oldGeometry) {
+    QQuickItem::geometryChanged(newGeometry, oldGeometry);
+    if (newGeometry.size() != oldGeometry.size()) {
+        update();
+    }
 }
 
 QUrl MdkObject::source() const { return isStopped() ? QUrl() : m_source; }
@@ -105,35 +338,69 @@ void MdkObject::setSource(const QUrl &value) {
             ? qUtf8Printable(QDir::toNativeSeparators(value.toLocalFile()))
             : qUtf8Printable(value.url()));
     m_source = value;
-    Q_EMIT sourceChanged();
-    m_player->scale(1.0, -1.0);
-    Q_EMIT positionChanged();
     m_player->prepare(0, [this](int64_t position, bool * /*unused*/) {
         Q_UNUSED(position)
         const auto &info = m_player->mediaInfo();
         m_hasVideo = !info.video.empty();
         m_hasAudio = !info.audio.empty();
-        // m_hasSubtitle = ...
-        Q_EMIT durationChanged();
-        Q_EMIT seekableChanged();
+        // ### TODO: m_hasSubtitle = ...
+        m_hasChapters = !info.chapters.empty();
+        m_hasMetaData = !info.metadata.empty();
         if (m_hasVideo) {
-            Q_EMIT videoSizeChanged();
+            videoReConfig();
         }
-        Q_EMIT loaded();
+        if (m_hasAudio) {
+            audioReConfig();
+        }
+        // ### TODO: if (m_hasSubtitle) { ... }
+        if (m_hasChapters) {
+            m_chapters.clear();
+            const auto &chapters = info.chapters;
+            for (auto &&chapter : qAsConst(chapters)) {
+                ChapterInfo info{};
+                info.beginTime = chapter.start_time;
+                info.endTime = chapter.end_time;
+                info.title = QString::fromStdString(chapter.title);
+                m_chapters.append(info);
+            }
+            Q_EMIT chaptersChanged();
+        }
+        if (m_hasMetaData) {
+            m_metaData.clear();
+            const auto &metaData = info.metadata;
+            for (auto &&data : qAsConst(metaData)) {
+                m_metaData.insert(QString::fromStdString(data.first),
+                                  QString::fromStdString(data.second));
+            }
+            Q_EMIT metaDataChanged();
+        }
         return true;
     });
     m_player->setState(MDK_NS::PlaybackState::Playing);
+    m_player->waitFor(MDK_NS::PlaybackState::Playing);
+    Q_EMIT sourceChanged();
+    Q_EMIT positionChanged();
+    Q_EMIT durationChanged();
+    Q_EMIT seekableChanged();
+    Q_EMIT formatChanged();
+    Q_EMIT fileSizeChanged();
+    Q_EMIT bitRateChanged();
+    Q_EMIT loaded();
 }
 
 QString MdkObject::fileName() const {
-    return m_source.isLocalFile() ? m_source.fileName()
-                                  : m_source.toDisplayString();
+    return m_source.isValid()
+        ? (m_source.isLocalFile() ? m_source.fileName()
+                                  : m_source.toDisplayString())
+        : QString();
 }
 
 QString MdkObject::path() const {
-    return m_source.isLocalFile()
-        ? QDir::toNativeSeparators(m_source.toLocalFile())
-        : m_source.toDisplayString();
+    return m_source.isValid()
+        ? (m_source.isLocalFile()
+               ? QDir::toNativeSeparators(m_source.toLocalFile())
+               : m_source.toDisplayString())
+        : QString();
 }
 
 qint64 MdkObject::position() const {
@@ -152,6 +419,9 @@ qint64 MdkObject::duration() const {
 }
 
 QSize MdkObject::videoSize() const {
+    if (isStopped()) {
+        return {};
+    }
     const auto &codec = m_player->mediaInfo().video.at(0).codec;
     return QSize(codec.width, codec.height);
 }
@@ -200,15 +470,18 @@ void MdkObject::setPlaybackState(MdkObject::PlaybackState value) {
         return;
     }
     switch (value) {
-    case PlaybackState::Playing:
+    case PlaybackState::Playing: {
         m_player->setState(MDK_NS::PlaybackState::Playing);
-        break;
-    case PlaybackState::Paused:
+        m_player->waitFor(MDK_NS::PlaybackState::Playing);
+    } break;
+    case PlaybackState::Paused: {
         m_player->setState(MDK_NS::PlaybackState::Paused);
-        break;
-    case PlaybackState::Stopped:
+        m_player->waitFor(MDK_NS::PlaybackState::Paused);
+    } break;
+    case PlaybackState::Stopped: {
         m_player->setState(MDK_NS::PlaybackState::Stopped);
-        break;
+        m_player->waitFor(MDK_NS::PlaybackState::Stopped);
+    } break;
     }
 }
 
@@ -335,12 +608,41 @@ void MdkObject::setSnapshotTemplate(const QString &value) {
     Q_EMIT snapshotTemplateChanged();
 }
 
-QStringList MdkObject::videoMimeTypes() const {
+QStringList MdkObject::videoMimeTypes() {
     return suffixesToMimeTypes(videoSuffixes());
 }
 
-QStringList MdkObject::audioMimeTypes() const {
+QStringList MdkObject::audioMimeTypes() {
     return suffixesToMimeTypes(audioSuffixes());
+}
+
+QString MdkObject::positionText() const {
+    return isStopped() ? QString() : timeToString(position());
+}
+
+QString MdkObject::durationText() const {
+    return isStopped() ? QString() : timeToString(duration());
+}
+
+QString MdkObject::format() const {
+    return isStopped() ? QString()
+                       : QString::fromUtf8(m_player->mediaInfo().format);
+}
+
+qint64 MdkObject::fileSize() const {
+    return isStopped() ? 0 : m_player->mediaInfo().size;
+}
+
+qint64 MdkObject::bitRate() const {
+    return isStopped() ? 0 : m_player->mediaInfo().bit_rate;
+}
+
+MdkObject::Chapters MdkObject::chapters() const {
+    return isStopped() ? Chapters{} : m_chapters;
+}
+
+MdkObject::MetaData MdkObject::metaData() const {
+    return isStopped() ? MetaData{} : m_metaData;
 }
 
 void MdkObject::open(const QUrl &value) {
@@ -360,6 +662,7 @@ void MdkObject::play() {
         return;
     }
     m_player->setState(MDK_NS::PlaybackState::Playing);
+    m_player->waitFor(MDK_NS::PlaybackState::Playing);
 }
 
 void MdkObject::play(const QUrl &value) {
@@ -379,6 +682,7 @@ void MdkObject::pause() {
         return;
     }
     m_player->setState(MDK_NS::PlaybackState::Paused);
+    m_player->waitFor(MDK_NS::PlaybackState::Paused);
 }
 
 void MdkObject::stop() {
@@ -386,11 +690,21 @@ void MdkObject::stop() {
         return;
     }
     m_player->setState(MDK_NS::PlaybackState::Stopped);
+    m_player->waitFor(MDK_NS::PlaybackState::Stopped);
     m_source.clear();
+    m_hasVideo = false;
+    m_hasAudio = false;
+    m_hasSubtitle = false;
+    m_hasChapters = false;
+    m_hasMetaData = false;
+    m_chapters.clear();
+    m_metaData.clear();
     Q_EMIT sourceChanged();
     Q_EMIT positionChanged();
     Q_EMIT durationChanged();
     Q_EMIT seekableChanged();
+    Q_EMIT chaptersChanged();
+    Q_EMIT metaDataChanged();
 }
 
 void MdkObject::seek(qint64 value) {
@@ -400,14 +714,14 @@ void MdkObject::seek(qint64 value) {
     m_player->seek(value);
 }
 
-void MdkObject::rotate(int value) {
+void MdkObject::rotateImage(int value) {
     if (isStopped()) {
         return;
     }
     m_player->rotate(value);
 }
 
-void MdkObject::scale(qreal x, qreal y) {
+void MdkObject::scaleImage(qreal x, qreal y) {
     if (isStopped()) {
         return;
     }
@@ -432,7 +746,7 @@ void MdkObject::snapshot() {
         });
 }
 
-bool MdkObject::isVideo(const QUrl &value) const {
+bool MdkObject::isVideo(const QUrl &value) {
     if (value.isValid()) {
         return videoSuffixes().contains(
             QString::fromUtf8("*.") + QFileInfo(value.fileName()).suffix(),
@@ -441,7 +755,7 @@ bool MdkObject::isVideo(const QUrl &value) const {
     return false;
 }
 
-bool MdkObject::isAudio(const QUrl &value) const {
+bool MdkObject::isAudio(const QUrl &value) {
     if (value.isValid()) {
         return audioSuffixes().contains(
             QString::fromUtf8("*.") + QFileInfo(value.fileName()).suffix(),
@@ -450,12 +764,12 @@ bool MdkObject::isAudio(const QUrl &value) const {
     return false;
 }
 
-bool MdkObject::isMedia(const QUrl &value) const {
+bool MdkObject::isMedia(const QUrl &value) {
     return (isVideo(value) || isAudio(value));
 }
 
 void MdkObject::timerEvent(QTimerEvent *event) {
-    Q_UNUSED(event)
+    QQuickItem::timerEvent(event);
     Q_EMIT positionChanged();
 }
 
@@ -512,6 +826,12 @@ void MdkObject::initMdkHandlers() {
     });
 }
 
+void MdkObject::videoReConfig() { Q_EMIT videoSizeChanged(); }
+
+void MdkObject::audioReConfig() {
+    // ### TODO
+}
+
 bool MdkObject::isLoaded() const { return !isStopped(); }
 
 bool MdkObject::isPlaying() const {
@@ -525,3 +845,5 @@ bool MdkObject::isPaused() const {
 bool MdkObject::isStopped() const {
     return m_player->state() == MDK_NS::PlaybackState::Stopped;
 }
+
+#include "mdkobject.moc"

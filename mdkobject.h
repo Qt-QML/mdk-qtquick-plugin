@@ -1,10 +1,18 @@
 #pragma once
 
-#include <QQuickFramebufferObject>
+#include "mdk/global.h"
+#include <QHash>
+#include <QQuickItem>
 #include <QUrl>
-#include <mdk/Player.h>
+#include <QVector>
 
-class MdkObject : public QQuickFramebufferObject {
+namespace MDK_NS {
+class Player;
+} // namespace MDK_NS
+
+class VideoTextureNode;
+
+class MdkObject : public QQuickItem {
     Q_OBJECT
     QML_ELEMENT
     Q_DISABLE_COPY_MOVE(MdkObject)
@@ -19,12 +27,12 @@ class MdkObject : public QQuickFramebufferObject {
     Q_PROPERTY(qreal volume READ volume WRITE setVolume NOTIFY volumeChanged)
     Q_PROPERTY(bool mute READ mute WRITE setMute NOTIFY muteChanged)
     Q_PROPERTY(bool seekable READ seekable NOTIFY seekableChanged)
-    Q_PROPERTY(MdkObject::PlaybackState playbackState READ playbackState WRITE
+    Q_PROPERTY(PlaybackState playbackState READ playbackState WRITE
                    setPlaybackState NOTIFY playbackStateChanged)
-    Q_PROPERTY(MdkObject::MediaStatus mediaStatus READ mediaStatus NOTIFY
-                   mediaStatusChanged)
-    Q_PROPERTY(MdkObject::LogLevel logLevel READ logLevel WRITE setLogLevel
-                   NOTIFY logLevelChanged)
+    Q_PROPERTY(
+        MediaStatus mediaStatus READ mediaStatus NOTIFY mediaStatusChanged)
+    Q_PROPERTY(LogLevel logLevel READ logLevel WRITE setLogLevel NOTIFY
+                   logLevelChanged)
     Q_PROPERTY(qreal playbackRate READ playbackRate WRITE setPlaybackRate NOTIFY
                    playbackRateChanged)
     Q_PROPERTY(qreal aspectRatio READ aspectRatio WRITE setAspectRatio NOTIFY
@@ -42,6 +50,15 @@ class MdkObject : public QQuickFramebufferObject {
     Q_PROPERTY(QStringList videoMimeTypes READ videoMimeTypes CONSTANT)
     Q_PROPERTY(QStringList audioMimeTypes READ audioMimeTypes CONSTANT)
     Q_PROPERTY(QStringList mediaMimeTypes READ mediaMimeTypes CONSTANT)
+    Q_PROPERTY(
+        QString positionText READ positionText NOTIFY positionTextChanged)
+    Q_PROPERTY(
+        QString durationText READ durationText NOTIFY durationTextChanged)
+    Q_PROPERTY(QString format READ format NOTIFY formatChanged)
+    Q_PROPERTY(qint64 fileSize READ fileSize NOTIFY fileSizeChanged)
+    Q_PROPERTY(qint64 bitRate READ bitRate NOTIFY bitRateChanged)
+    Q_PROPERTY(Chapters chapters READ chapters NOTIFY chaptersChanged)
+    Q_PROPERTY(MetaData metaData READ metaData NOTIFY metaDataChanged)
 
 public:
     enum class PlaybackState { Stopped, Playing, Paused };
@@ -63,13 +80,16 @@ public:
     enum class LogLevel { Off, Debug, Warning, Critical, Fatal, Info };
     Q_ENUM(LogLevel)
 
+    struct ChapterInfo {
+        qint64 beginTime = 0, endTime = 0;
+        QString title = QString();
+    };
+    using Chapters = QVector<ChapterInfo>;
+
+    using MetaData = QHash<QString, QString>;
+
     explicit MdkObject(QQuickItem *parent = nullptr);
     ~MdkObject() override;
-
-    Renderer *createRenderer() const override;
-
-    void renderVideo();
-    void setVideoSurfaceSize(QSize size);
 
     QUrl source() const;
     void setSource(const QUrl &value);
@@ -93,13 +113,13 @@ public:
 
     bool seekable() const;
 
-    MdkObject::PlaybackState playbackState() const;
-    void setPlaybackState(MdkObject::PlaybackState value);
+    PlaybackState playbackState() const;
+    void setPlaybackState(PlaybackState value);
 
-    MdkObject::MediaStatus mediaStatus() const;
+    MediaStatus mediaStatus() const;
 
-    MdkObject::LogLevel logLevel() const;
-    void setLogLevel(MdkObject::LogLevel value);
+    LogLevel logLevel() const;
+    void setLogLevel(LogLevel value);
 
     qreal playbackRate() const;
     void setPlaybackRate(qreal value);
@@ -116,7 +136,7 @@ public:
     QString snapshotTemplate() const;
     void setSnapshotTemplate(const QString &value);
 
-    QStringList videoSuffixes() const {
+    static QStringList videoSuffixes() {
         return QStringList{
             QString::fromUtf8("*.3g2"),   QString::fromUtf8("*.3ga"),
             QString::fromUtf8("*.3gp"),   QString::fromUtf8("*.3gp2"),
@@ -169,7 +189,7 @@ public:
             QString::fromUtf8("*.xspf")};
     }
 
-    QStringList audioSuffixes() const {
+    static QStringList audioSuffixes() {
         return QStringList{
             QString::fromUtf8("*.mp3"),  QString::fromUtf8("*.aac"),
             QString::fromUtf8("*.mka"),  QString::fromUtf8("*.dts"),
@@ -179,7 +199,7 @@ public:
             QString::fromUtf8("*.wv")};
     }
 
-    QStringList subtitleSuffixes() const {
+    static QStringList subtitleSuffixes() {
         return QStringList{
             QString::fromUtf8("*.utf"),   QString::fromUtf8("*.utf8"),
             QString::fromUtf8("*.utf-8"), QString::fromUtf8("*.idx"),
@@ -190,23 +210,37 @@ public:
             QString::fromUtf8("*.scc"),   QString::fromUtf8("*.smi")};
     }
 
-    QStringList mediaSuffixes() const {
+    static QStringList mediaSuffixes() {
         QStringList suffixes{};
         suffixes.append(videoSuffixes());
         suffixes.append(audioSuffixes());
         return suffixes;
     }
 
-    QStringList videoMimeTypes() const;
+    static QStringList videoMimeTypes();
 
-    QStringList audioMimeTypes() const;
+    static QStringList audioMimeTypes();
 
-    QStringList mediaMimeTypes() const {
+    static QStringList mediaMimeTypes() {
         QStringList mimeTypes{};
         mimeTypes.append(videoMimeTypes());
         mimeTypes.append(audioMimeTypes());
         return mimeTypes;
     }
+
+    QString positionText() const;
+
+    QString durationText() const;
+
+    QString format() const;
+
+    qint64 fileSize() const;
+
+    qint64 bitRate() const;
+
+    Chapters chapters() const;
+
+    MetaData metaData() const;
 
 public Q_SLOTS:
     void open(const QUrl &value);
@@ -215,31 +249,38 @@ public Q_SLOTS:
     void pause();
     void stop();
     void seek(qint64 value);
-    void rotate(int value);
-    void scale(qreal x, qreal y);
+    // Avoid naming conflicts of QQuickItem's own functions.
+    void rotateImage(int value);
+    void scaleImage(qreal x, qreal y);
     void snapshot();
-    bool isVideo(const QUrl &value) const;
-    bool isAudio(const QUrl &value) const;
-    bool isMedia(const QUrl &value) const;
-
-protected:
-    void timerEvent(QTimerEvent *event) override;
-
-private:
-    void initMdkHandlers();
-
-private:
     bool isLoaded() const;
     bool isPlaying() const;
     bool isPaused() const;
     bool isStopped() const;
+    static bool isVideo(const QUrl &value);
+    static bool isAudio(const QUrl &value);
+    static bool isMedia(const QUrl &value);
+
+protected:
+    void timerEvent(QTimerEvent *event) override;
+    QSGNode *updatePaintNode(QSGNode *node, UpdatePaintNodeData *data) override;
+    void geometryChanged(const QRectF &newGeometry,
+                         const QRectF &oldGeometry) override;
+
+private Q_SLOTS:
+    void invalidateSceneGraph();
+
+private:
+    void releaseResources() override;
+    void initMdkHandlers();
+    void videoReConfig();
+    void audioReConfig();
 
 Q_SIGNALS:
     void loaded();
     void playing();
     void paused();
     void stopped();
-
     void sourceChanged();
     void fileNameChanged();
     void pathChanged();
@@ -257,14 +298,27 @@ Q_SIGNALS:
     void snapshotDirectoryChanged();
     void snapshotFormatChanged();
     void snapshotTemplateChanged();
+    void positionTextChanged();
+    void durationTextChanged();
+    void formatChanged();
+    void fileSizeChanged();
+    void bitRateChanged();
+    void chaptersChanged();
+    void metaDataChanged();
 
 private:
+    friend class VideoTextureNode;
+    VideoTextureNode *m_node = nullptr;
     QUrl m_source = QUrl();
-    QScopedPointer<MDK_NS::Player> m_player{new MDK_NS::Player};
+    QSharedPointer<MDK_NS::Player> m_player;
     qreal m_volume = 1.0;
     bool m_mute = false, m_hasVideo = false, m_hasAudio = false,
-         m_hasSubtitle = false;
+         m_hasSubtitle = false, m_hasChapters = false, m_hasMetaData = false;
     QString m_snapshotDirectory = QString(),
             m_snapshotFormat = QString::fromUtf8("png"),
             m_snapshotTemplate = QString();
+    Chapters m_chapters = {};
+    MetaData m_metaData = {};
 };
+
+Q_DECLARE_METATYPE(MdkObject::ChapterInfo)
