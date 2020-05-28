@@ -28,6 +28,13 @@ Item {
     property alias videoMimeTypes: mdkObject.videoMimeTypes
     property alias audioMimeTypes: mdkObject.audioMimeTypes
     property alias mediaMimeTypes: mdkObject.mediaMimeTypes
+    property alias positionText: mdkObject.positionText
+    property alias durationText: mdkObject.durationText
+    property alias format: mdkObject.format
+    property alias fileSize: mdkObject.fileSize
+    property alias bitRate: mdkObject.bitRate
+    property alias chapters: mdkObject.chapters
+    property alias metaData: mdkObject.metaData
 
     signal loaded
     signal playing
@@ -49,11 +56,11 @@ Item {
     function seek(position) {
         mdkObject.seek(position);
     }
-    function rotate(degree) {
-        mdkObject.rotate(degree);
+    function rotateImage(degree) {
+        mdkObject.rotateImage(degree);
     }
-    function scale(x, y) {
-        mdkObject.scale(x, y);
+    function scaleImage(x, y) {
+        mdkObject.scaleImage(x, y);
     }
     function snapshot() {
         mdkObject.snapshot();
@@ -67,19 +74,17 @@ Item {
     function isMedia(url) {
         return mdkObject.isMedia(url);
     }
+    function isLoaded() {
+        return mdkObject.isLoaded();
+    }
     function isPlaying() {
-        return mdkObject.playbackState === MdkObject.Playing;
+        return mdkObject.isPlaying();
     }
     function isPaused() {
-        return mdkObject.playbackState === MdkObject.Paused;
+        return mdkObject.isPaused();
     }
     function isStopped() {
-        return mdkObject.playbackState === MdkObject.Stopped;
-    }
-
-    Rectangle {
-        anchors.fill: mdkPlayer
-        color: "black"
+        return mdkObject.isStopped();
     }
 
     MdkObject {
