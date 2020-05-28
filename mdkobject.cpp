@@ -78,6 +78,7 @@ public:
     }
 
     ~VideoTextureNode() override {
+        delete texture();
         // Release gfx resources.
 #if QT_CONFIG(opengl)
         fbo_gl.reset();
