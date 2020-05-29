@@ -75,9 +75,8 @@ class VideoTextureNode : public QSGTextureProvider,
 public:
     explicit VideoTextureNode(MdkObject *item)
         : m_item(item), m_player(item->m_player) {
-        Q_ASSERT(item && !m_player.isNull());
+        Q_ASSERT(m_item && !m_player.isNull());
         m_window = m_item->window();
-        Q_ASSERT(m_window);
         connect(m_window, &QQuickWindow::beforeRendering, this,
                 &VideoTextureNode::render);
         connect(m_window, &QQuickWindow::screenChanged, this,
@@ -104,14 +103,14 @@ public:
 
     void sync() {
         m_dpr = m_window->effectiveDevicePixelRatio();
-        const QSize newSize = m_window->size() * m_dpr;
+        const QSizeF newSize = m_item->size() * m_dpr;
         bool needsNew = false;
         if (!texture()) {
             needsNew = true;
         }
         if (newSize != m_size) {
             needsNew = true;
-            m_size = newSize;
+            m_size = {qRound(newSize.width()), qRound(newSize.height())};
         }
         if (!needsNew) {
             return;
