@@ -374,7 +374,7 @@ private:
     qreal m_volume = 1.0;
     bool m_mute = false, m_hasVideo = false, m_hasAudio = false,
          m_hasSubtitle = false, m_hasChapters = false, m_hasMetaData = false,
-         m_hardwareDecoding = true;
+         m_hardwareDecoding = false;
     QString m_snapshotDirectory = QString(),
             m_snapshotFormat = QString::fromUtf8("png"),
             m_snapshotTemplate = QString();
