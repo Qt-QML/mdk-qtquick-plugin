@@ -53,6 +53,18 @@ QString timeToString(const qint64 ms) {
     return QTime(0, 0).addMSecs(ms).toString(QString::fromUtf8("hh:mm:ss"));
 }
 
+std::vector<std::string>
+qStringListToStdStringVector(const QStringList &stringList) {
+    if (stringList.isEmpty()) {
+        return {};
+    }
+    std::vector<std::string> result{};
+    for (auto &&string : qAsConst(stringList)) {
+        result.push_back(string.toStdString());
+    }
+    return result;
+}
+
 } // namespace
 
 class VideoTextureNode : public QSGTextureProvider,
@@ -248,20 +260,12 @@ private:
 };
 
 MdkObject::MdkObject(QQuickItem *parent) : QQuickItem(parent) {
+    // Disable status messages as they are quite annoying.
+    qputenv("MDK_LOG_STATUS", "0");
     m_player.reset(new MDK_NS::Player);
     Q_ASSERT(!m_player.isNull());
     setFlag(ItemHasContents, true);
     qRegisterMetaType<ChapterInfo>();
-    // Disable status messages as they are quite annoying.
-    qputenv("MDK_LOG_STATUS", "0");
-#ifdef Q_OS_WINDOWS
-    m_player->setVideoDecoders({"MFT:d3d=11", "MFT:d3d=9", "MFT", "D3D11",
-                                "DXVA", "CUDA", "NVDEC", "FFmpeg"});
-#elif defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
-    m_player->setVideoDecoders({"VAAPI", "VDPAU", "CUDA", "NVDEC", "FFmpeg"});
-#elif defined(Q_OS_MACOS)
-    m_player->setVideoDecoders({"VT", "VideoToolbox", "FFmpeg"});
-#endif
     m_player->setRenderCallback(
         [this](void *) { QMetaObject::invokeMethod(this, "update"); });
     // MUST set before setMedia() because setNextMedia() is called when media is
@@ -402,7 +406,7 @@ qint64 MdkObject::position() const {
     return isStopped() ? 0 : m_player->position();
 }
 
-void MdkObject::setPosition(qint64 value) {
+void MdkObject::setPosition(const qint64 value) {
     if (isStopped() || (value == position())) {
         return;
     }
@@ -423,7 +427,7 @@ QSize MdkObject::videoSize() const {
 
 qreal MdkObject::volume() const { return m_volume; }
 
-void MdkObject::setVolume(qreal value) {
+void MdkObject::setVolume(const qreal value) {
     if (qFuzzyCompare(value, volume())) {
         return;
     }
@@ -434,7 +438,7 @@ void MdkObject::setVolume(qreal value) {
 
 bool MdkObject::mute() const { return m_mute; }
 
-void MdkObject::setMute(bool value) {
+void MdkObject::setMute(const bool value) {
     if (value == mute()) {
         return;
     }
@@ -460,7 +464,7 @@ MdkObject::PlaybackState MdkObject::playbackState() const {
     return PlaybackState::Stopped;
 }
 
-void MdkObject::setPlaybackState(MdkObject::PlaybackState value) {
+void MdkObject::setPlaybackState(const MdkObject::PlaybackState value) {
     if (isStopped() || (value == playbackState())) {
         return;
     }
@@ -520,7 +524,7 @@ MdkObject::LogLevel MdkObject::logLevel() const {
     }
 }
 
-void MdkObject::setLogLevel(MdkObject::LogLevel value) {
+void MdkObject::setLogLevel(const MdkObject::LogLevel value) {
     if (value == logLevel()) {
         return;
     }
@@ -549,8 +553,8 @@ qreal MdkObject::playbackRate() const {
     return isStopped() ? 1.0 : static_cast<qreal>(m_player->playbackRate());
 }
 
-void MdkObject::setPlaybackRate(qreal value) {
-    if (isStopped()) {
+void MdkObject::setPlaybackRate(const qreal value) {
+    if (isStopped() || (value == playbackRate())) {
         return;
     }
     m_player->setPlaybackRate(value);
@@ -559,8 +563,8 @@ void MdkObject::setPlaybackRate(qreal value) {
 
 qreal MdkObject::aspectRatio() const { return static_cast<qreal>(16.0 / 9.0); }
 
-void MdkObject::setAspectRatio(qreal value) {
-    if (isStopped()) {
+void MdkObject::setAspectRatio(const qreal value) {
+    if (isStopped() || (value == aspectRatio())) {
         return;
     }
     m_player->setAspectRatio(value);
@@ -572,7 +576,7 @@ QString MdkObject::snapshotDirectory() const {
 }
 
 void MdkObject::setSnapshotDirectory(const QString &value) {
-    if (value.isEmpty()) {
+    if (value.isEmpty() || (value == snapshotDirectory())) {
         return;
     }
     const QString val = QDir::toNativeSeparators(value);
@@ -640,6 +644,56 @@ MdkObject::MetaData MdkObject::metaData() const {
     return isStopped() ? MetaData{} : m_metaData;
 }
 
+bool MdkObject::hardwareDecoding() const { return m_hardwareDecoding; }
+
+void MdkObject::setHardwareDecoding(const bool value) {
+    if (m_hardwareDecoding != value) {
+        m_hardwareDecoding = value;
+        if (m_hardwareDecoding) {
+            setVideoDecoders(defaultVideoDecoders());
+        } else {
+            setVideoDecoders({QString::fromUtf8("FFmpeg")});
+        }
+        Q_EMIT hardwareDecodingChanged();
+    }
+}
+
+QStringList MdkObject::videoDecoders() const { return m_videoDecoders; }
+
+void MdkObject::setVideoDecoders(const QStringList &value) {
+    if (m_videoDecoders != value) {
+        m_videoDecoders =
+            value.isEmpty() ? QStringList{QString::fromUtf8("FFmpeg")} : value;
+        m_player->setVideoDecoders(
+            qStringListToStdStringVector(m_videoDecoders));
+        Q_EMIT videoDecodersChanged();
+    }
+}
+
+QStringList MdkObject::audioDecoders() const { return m_audioDecoders; }
+
+void MdkObject::setAudioDecoders(const QStringList &value) {
+    if (m_audioDecoders != value) {
+        // ### FIXME: value.isEmpty() ?
+        m_audioDecoders = value;
+        m_player->setAudioDecoders(
+            qStringListToStdStringVector(m_audioDecoders));
+        Q_EMIT audioDecodersChanged();
+    }
+}
+
+QStringList MdkObject::audioBackends() const { return m_audioBackends; }
+
+void MdkObject::setAudioBackends(const QStringList &value) {
+    if (m_audioBackends != value) {
+        // ### FIXME: value.isEmpty() ?
+        m_audioBackends = value;
+        m_player->setAudioBackends(
+            qStringListToStdStringVector(m_audioBackends));
+        Q_EMIT audioBackendsChanged();
+    }
+}
+
 void MdkObject::open(const QUrl &value) {
     if (!value.isValid()) {
         return;
@@ -702,21 +756,21 @@ void MdkObject::stop() {
     Q_EMIT metaDataChanged();
 }
 
-void MdkObject::seek(qint64 value) {
+void MdkObject::seek(const qint64 value) {
     if (isStopped() || (value == position())) {
         return;
     }
     m_player->seek(value);
 }
 
-void MdkObject::rotateImage(int value) {
+void MdkObject::rotateImage(const int value) {
     if (isStopped()) {
         return;
     }
     m_player->rotate(value);
 }
 
-void MdkObject::scaleImage(qreal x, qreal y) {
+void MdkObject::scaleImage(const qreal x, const qreal y) {
     if (isStopped()) {
         return;
     }
@@ -761,6 +815,18 @@ bool MdkObject::isAudio(const QUrl &value) {
 
 bool MdkObject::isMedia(const QUrl &value) {
     return (isVideo(value) || isAudio(value));
+}
+
+bool MdkObject::currentIsVideo() const {
+    return isStopped() ? false : isVideo(m_source);
+}
+
+bool MdkObject::currentIsAudio() const {
+    return isStopped() ? false : isAudio(m_source);
+}
+
+bool MdkObject::currentIsMedia() const {
+    return isStopped() ? false : (currentIsVideo() || currentIsAudio());
 }
 
 void MdkObject::timerEvent(QTimerEvent *event) {
@@ -830,15 +896,15 @@ void MdkObject::audioReConfig() {
 bool MdkObject::isLoaded() const { return !isStopped(); }
 
 bool MdkObject::isPlaying() const {
-    return m_player->state() == MDK_NS::PlaybackState::Playing;
+    return (m_player->state() == MDK_NS::PlaybackState::Playing);
 }
 
 bool MdkObject::isPaused() const {
-    return m_player->state() == MDK_NS::PlaybackState::Paused;
+    return (m_player->state() == MDK_NS::PlaybackState::Paused);
 }
 
 bool MdkObject::isStopped() const {
-    return m_player->state() == MDK_NS::PlaybackState::Stopped;
+    return (m_player->state() == MDK_NS::PlaybackState::Stopped);
 }
 
 #include "mdkobject.moc"

@@ -59,6 +59,18 @@ class MdkObject : public QQuickItem {
     Q_PROPERTY(qint64 bitRate READ bitRate NOTIFY bitRateChanged)
     Q_PROPERTY(Chapters chapters READ chapters NOTIFY chaptersChanged)
     Q_PROPERTY(MetaData metaData READ metaData NOTIFY metaDataChanged)
+    Q_PROPERTY(bool hardwareDecoding READ hardwareDecoding WRITE
+                   setHardwareDecoding NOTIFY hardwareDecodingChanged)
+    Q_PROPERTY(QStringList videoDecoders READ videoDecoders WRITE
+                   setVideoDecoders NOTIFY videoDecodersChanged)
+    Q_PROPERTY(QStringList audioDecoders READ audioDecoders WRITE
+                   setAudioDecoders NOTIFY audioDecodersChanged)
+    Q_PROPERTY(
+        QStringList defaultVideoDecoders READ defaultVideoDecoders CONSTANT)
+    Q_PROPERTY(
+        QStringList defaultAudioDecoders READ defaultAudioDecoders CONSTANT)
+    Q_PROPERTY(QStringList audioBackends READ audioBackends WRITE
+                   setAudioBackends NOTIFY audioBackendsChanged)
 
 public:
     enum class PlaybackState { Stopped, Playing, Paused };
@@ -99,33 +111,33 @@ public:
     QString path() const;
 
     qint64 position() const;
-    void setPosition(qint64 value);
+    void setPosition(const qint64 value);
 
     qint64 duration() const;
 
     QSize videoSize() const;
 
     qreal volume() const;
-    void setVolume(qreal value);
+    void setVolume(const qreal value);
 
     bool mute() const;
-    void setMute(bool value);
+    void setMute(const bool value);
 
     bool seekable() const;
 
     PlaybackState playbackState() const;
-    void setPlaybackState(PlaybackState value);
+    void setPlaybackState(const PlaybackState value);
 
     MediaStatus mediaStatus() const;
 
     LogLevel logLevel() const;
-    void setLogLevel(LogLevel value);
+    void setLogLevel(const LogLevel value);
 
     qreal playbackRate() const;
-    void setPlaybackRate(qreal value);
+    void setPlaybackRate(const qreal value);
 
     qreal aspectRatio() const;
-    void setAspectRatio(qreal value);
+    void setAspectRatio(const qreal value);
 
     QString snapshotDirectory() const;
     void setSnapshotDirectory(const QString &value);
@@ -242,16 +254,57 @@ public:
 
     MetaData metaData() const;
 
+    bool hardwareDecoding() const;
+    void setHardwareDecoding(const bool value);
+
+    QStringList videoDecoders() const;
+    void setVideoDecoders(const QStringList &value);
+
+    QStringList audioDecoders() const;
+    void setAudioDecoders(const QStringList &value);
+
+    // The order is important. Only FFmpeg is software decoding.
+    QStringList defaultVideoDecoders() const {
+#ifdef Q_OS_WINDOWS
+        return QStringList{
+            QString::fromUtf8("MFT:d3d=11"), QString::fromUtf8("MFT:d3d=9"),
+            QString::fromUtf8("MFT"),        QString::fromUtf8("D3D11"),
+            QString::fromUtf8("DXVA"),       QString::fromUtf8("CUDA"),
+            QString::fromUtf8("NVDEC"),      QString::fromUtf8("FFmpeg")};
+#elif defined(Q_OS_LINUX)
+#ifdef Q_OS_ANDROID
+        return QStringList{QString::fromUtf8("AMediaCodec"),
+                           QString::fromUtf8("FFmpeg")};
+#else
+        return QStringList{
+            QString::fromUtf8("VAAPI"), QString::fromUtf8("VDPAU"),
+            QString::fromUtf8("CUDA"), QString::fromUtf8("NVDEC"),
+            QString::fromUtf8("FFmpeg")};
+#endif
+#elif defined(Q_OS_DARWIN)
+        return QStringList{QString::fromUtf8("VT"),
+                           QString::fromUtf8("VideoToolbox"),
+                           QString::fromUtf8("FFmpeg")};
+#endif
+    }
+
+    QStringList defaultAudioDecoders() const { return {}; }
+
+    QStringList audioBackends() const;
+    // Available audio backends: XAudio2 (Windows only), ALSA (Linux only),
+    // AudioQueue (Apple only), OpenSL (Android only), OpenAL
+    void setAudioBackends(const QStringList &value);
+
 public Q_SLOTS:
     void open(const QUrl &value);
     void play();
     void play(const QUrl &value);
     void pause();
     void stop();
-    void seek(qint64 value);
+    void seek(const qint64 value);
     // Avoid naming conflicts of QQuickItem's own functions.
-    void rotateImage(int value);
-    void scaleImage(qreal x, qreal y);
+    void rotateImage(const int value);
+    void scaleImage(const qreal x, const qreal y);
     void snapshot();
     bool isLoaded() const;
     bool isPlaying() const;
@@ -260,6 +313,9 @@ public Q_SLOTS:
     static bool isVideo(const QUrl &value);
     static bool isAudio(const QUrl &value);
     static bool isMedia(const QUrl &value);
+    bool currentIsVideo() const;
+    bool currentIsAudio() const;
+    bool currentIsMedia() const;
 
 protected:
     void timerEvent(QTimerEvent *event) override;
@@ -305,6 +361,10 @@ Q_SIGNALS:
     void bitRateChanged();
     void chaptersChanged();
     void metaDataChanged();
+    void hardwareDecodingChanged();
+    void videoDecodersChanged();
+    void audioDecodersChanged();
+    void audioBackendsChanged();
 
 private:
     friend class VideoTextureNode;
@@ -313,12 +373,15 @@ private:
     QSharedPointer<MDK_NS::Player> m_player;
     qreal m_volume = 1.0;
     bool m_mute = false, m_hasVideo = false, m_hasAudio = false,
-         m_hasSubtitle = false, m_hasChapters = false, m_hasMetaData = false;
+         m_hasSubtitle = false, m_hasChapters = false, m_hasMetaData = false,
+         m_hardwareDecoding = true;
     QString m_snapshotDirectory = QString(),
             m_snapshotFormat = QString::fromUtf8("png"),
             m_snapshotTemplate = QString();
     Chapters m_chapters = {};
     MetaData m_metaData = {};
+    QStringList m_videoDecoders = {}, m_audioDecoders = {},
+                m_audioBackends = {};
 };
 
 Q_DECLARE_METATYPE(MdkObject::ChapterInfo)

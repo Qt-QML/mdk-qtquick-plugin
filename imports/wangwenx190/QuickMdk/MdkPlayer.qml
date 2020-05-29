@@ -35,6 +35,12 @@ Item {
     property alias bitRate: mdkObject.bitRate
     property alias chapters: mdkObject.chapters
     property alias metaData: mdkObject.metaData
+    property alias hardwareDecoding: mdkObject.hardwareDecoding
+    property alias videoDecoders: mdkObject.videoDecoders
+    property alias audioDecoders: mdkObject.audioDecoders
+    property alias defaultVideoDecoders: mdkObject.defaultVideoDecoders
+    property alias defaultAudioDecoders: mdkObject.defaultAudioDecoders
+    property alias audioBackends: mdkObject.audioBackends
 
     signal loaded
     signal playing
@@ -85,6 +91,15 @@ Item {
     }
     function isStopped() {
         return mdkObject.isStopped();
+    }
+    function currentIsVideo() {
+        return mdkObject.currentIsVideo();
+    }
+    function currentIsAudio() {
+        return mdkObject.currentIsAudio();
+    }
+    function currentIsMedia() {
+        return mdkObject.currentIsMedia();
     }
 
     MdkObject {
