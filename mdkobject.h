@@ -71,6 +71,10 @@ class MdkObject : public QQuickItem {
         QStringList defaultAudioDecoders READ defaultAudioDecoders CONSTANT)
     Q_PROPERTY(QStringList audioBackends READ audioBackends WRITE
                    setAudioBackends NOTIFY audioBackendsChanged)
+    Q_PROPERTY(bool autoStart READ autoStart WRITE setAutoStart NOTIFY
+                   autoStartChanged)
+    Q_PROPERTY(bool livePreview READ livePreview WRITE setLivePreview NOTIFY
+                   livePreviewChanged)
 
 public:
     enum class PlaybackState { Stopped, Playing, Paused };
@@ -295,6 +299,12 @@ public:
     // AudioQueue (Apple only), OpenSL (Android only), OpenAL
     void setAudioBackends(const QStringList &value);
 
+    bool autoStart() const;
+    void setAutoStart(const bool value);
+
+    bool livePreview() const;
+    void setLivePreview(const bool value);
+
 public Q_SLOTS:
     void open(const QUrl &value);
     void play();
@@ -365,6 +375,8 @@ Q_SIGNALS:
     void videoDecodersChanged();
     void audioDecodersChanged();
     void audioBackendsChanged();
+    void autoStartChanged();
+    void livePreviewChanged();
 
 private:
     friend class VideoTextureNode;
@@ -374,7 +386,7 @@ private:
     qreal m_volume = 1.0;
     bool m_mute = false, m_hasVideo = false, m_hasAudio = false,
          m_hasSubtitle = false, m_hasChapters = false, m_hasMetaData = false,
-         m_hardwareDecoding = false;
+         m_hardwareDecoding = false, m_autoStart = true, m_livePreview = false;
     QString m_snapshotDirectory = QString(),
             m_snapshotFormat = QString::fromUtf8("png"),
             m_snapshotTemplate = QString();

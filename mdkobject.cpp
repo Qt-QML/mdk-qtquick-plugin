@@ -323,7 +323,7 @@ void MdkObject::geometryChanged(const QRectF &newGeometry,
 QUrl MdkObject::source() const { return isStopped() ? QUrl() : m_source; }
 
 void MdkObject::setSource(const QUrl &value) {
-    if (!value.isValid() || (value == m_source) || !isMedia(value)) {
+    if (!value.isValid() || (value == source()) || !isMedia(value)) {
         return;
     }
     m_player->setNextMedia(nullptr, -1);
@@ -374,8 +374,10 @@ void MdkObject::setSource(const QUrl &value) {
         }
         return true;
     });
-    m_player->setState(MDK_NS::PlaybackState::Playing);
-    m_player->waitFor(MDK_NS::PlaybackState::Playing);
+    if (autoStart() && !livePreview()) {
+        m_player->setState(MDK_NS::PlaybackState::Playing);
+        m_player->waitFor(MDK_NS::PlaybackState::Playing);
+    }
     Q_EMIT sourceChanged();
     Q_EMIT positionChanged();
     Q_EMIT durationChanged();
@@ -387,17 +389,17 @@ void MdkObject::setSource(const QUrl &value) {
 }
 
 QString MdkObject::fileName() const {
-    return m_source.isValid()
-        ? (m_source.isLocalFile() ? m_source.fileName()
-                                  : m_source.toDisplayString())
+    const QUrl url = source();
+    return (!isStopped() && url.isValid())
+        ? (url.isLocalFile() ? url.fileName() : url.toDisplayString())
         : QString();
 }
 
 QString MdkObject::path() const {
-    return m_source.isValid()
-        ? (m_source.isLocalFile()
-               ? QDir::toNativeSeparators(m_source.toLocalFile())
-               : m_source.toDisplayString())
+    const QUrl url = source();
+    return (!isStopped() && url.isValid())
+        ? (url.isLocalFile() ? QDir::toNativeSeparators(url.toLocalFile())
+                             : url.toDisplayString())
         : QString();
 }
 
@@ -448,7 +450,7 @@ void MdkObject::setMute(const bool value) {
 
 bool MdkObject::seekable() const {
     // Local files are always seekable, in theory.
-    return (isLoaded() && m_source.isLocalFile());
+    return (isLoaded() && source().isLocalFile());
 }
 
 MdkObject::PlaybackState MdkObject::playbackState() const {
@@ -693,11 +695,44 @@ void MdkObject::setAudioBackends(const QStringList &value) {
     }
 }
 
+bool MdkObject::autoStart() const { return m_autoStart; }
+
+void MdkObject::setAutoStart(const bool value) {
+    if (m_autoStart != value) {
+        m_autoStart = value;
+        Q_EMIT autoStartChanged();
+    }
+}
+
+bool MdkObject::livePreview() const { return m_livePreview; }
+
+void MdkObject::setLivePreview(const bool value) {
+    if (m_livePreview != value) {
+        m_livePreview = value;
+        if (m_livePreview) {
+            // We only need static images.
+            m_player->setState(MDK_NS::PlaybackState::Paused);
+            // We don't want the preview window play sound.
+            m_player->setMute(true);
+            // Decode as soon as possible when media data received. It also
+            // ensures the maximum delay of rendered video is one second and no
+            // accumulated delay.
+            m_player->setBufferRange(0, 1000, true);
+            // And don't forget to use accurate seek.
+        } else {
+            // Restore everything to default.
+            m_player->setBufferRange(4000, 16000, false);
+            m_player->setMute(mute());
+        }
+        Q_EMIT livePreviewChanged();
+    }
+}
+
 void MdkObject::open(const QUrl &value) {
     if (!value.isValid()) {
         return;
     }
-    if ((value != m_source) && isMedia(value)) {
+    if ((value != source()) && isMedia(value)) {
         setSource(value);
     }
     if (!isPlaying()) {
@@ -706,7 +741,7 @@ void MdkObject::open(const QUrl &value) {
 }
 
 void MdkObject::play() {
-    if (!isPaused() || !m_source.isValid()) {
+    if (!isPaused() || !source().isValid()) {
         return;
     }
     m_player->setState(MDK_NS::PlaybackState::Playing);
@@ -717,10 +752,11 @@ void MdkObject::play(const QUrl &value) {
     if (!value.isValid()) {
         return;
     }
-    if ((value == m_source) && !isPlaying()) {
+    const QUrl url = source();
+    if ((value == url) && !isPlaying()) {
         play();
     }
-    if ((value != m_source) && isMedia(value)) {
+    if ((value != url) && isMedia(value)) {
         open(value);
     }
 }
@@ -737,6 +773,7 @@ void MdkObject::stop() {
     if (isStopped()) {
         return;
     }
+    m_player->setNextMedia(nullptr, -1);
     m_player->setState(MDK_NS::PlaybackState::Stopped);
     m_player->waitFor(MDK_NS::PlaybackState::Stopped);
     m_source.clear();
@@ -759,7 +796,10 @@ void MdkObject::seek(const qint64 value) {
     if (isStopped() || (value == position())) {
         return;
     }
-    m_player->seek(value);
+    // We have to seek accurately when we are in live preview mode.
+    m_player->seek(value,
+                   livePreview() ? MDK_NS::SeekFlag::FromStart
+                                 : MDK_NS::SeekFlag::Default);
 }
 
 void MdkObject::rotateImage(const int value) {
@@ -817,11 +857,11 @@ bool MdkObject::isMedia(const QUrl &value) {
 }
 
 bool MdkObject::currentIsVideo() const {
-    return isStopped() ? false : isVideo(m_source);
+    return isStopped() ? false : isVideo(source());
 }
 
 bool MdkObject::currentIsAudio() const {
-    return isStopped() ? false : isAudio(m_source);
+    return isStopped() ? false : isAudio(source());
 }
 
 bool MdkObject::currentIsMedia() const {
