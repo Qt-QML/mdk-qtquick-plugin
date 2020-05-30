@@ -140,8 +140,6 @@ public:
                 QQuickWindow::NativeObjectTexture,
                 m_texture_d3d11.GetAddressOf(), 0, m_size);
             setTexture(wrapper);
-            qDebug() << "Got QSGTexture wrapper" << wrapper
-                     << "for an D3D11 texture of size" << m_size;
             MDK_NS::D3D11RenderAPI ra{};
             Microsoft::WRL::ComPtr<ID3D11DeviceContext> ctx;
             dev->GetImmediateContext(&ctx);
@@ -176,8 +174,6 @@ public:
             QSGTexture *wrapper = m_window->createTextureFromNativeObject(
                 QQuickWindow::NativeObjectTexture, &m_texture_mtl, 0, m_size);
             setTexture(wrapper);
-            qDebug().noquote() << "Got QSGTexture wrapper" << wrapper
-                               << "for an MTLTexture of size" << m_size;
             MDK_NS::MetalRenderAPI ra{};
             ra.texture = (__bridge void *)m_texture_mtl;
             ra.device = (__bridge void *)dev;
@@ -196,9 +192,6 @@ public:
             QSGTexture *wrapper = m_window->createTextureFromNativeObject(
                 QQuickWindow::NativeObjectTexture, &tex, 0, m_size);
             setTexture(wrapper);
-            qDebug().noquote()
-                << "Got QSGTexture wrapper" << wrapper
-                << "for an OpenGL texture '" << tex << "' of size" << m_size;
             // Flip y.
             player->scale(1.0f, -1.0f);
 #endif
