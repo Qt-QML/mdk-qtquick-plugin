@@ -41,6 +41,8 @@ Item {
     property alias defaultVideoDecoders: mdkObject.defaultVideoDecoders
     property alias defaultAudioDecoders: mdkObject.defaultAudioDecoders
     property alias audioBackends: mdkObject.audioBackends
+    property alias autoStart: mdkObject.autoStart
+    property alias livePreview: mdkObject.livePreview
 
     signal loaded
     signal playing
