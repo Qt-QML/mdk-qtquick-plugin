@@ -26,15 +26,26 @@
 
 #include "mdk/global.h"
 #include <QHash>
+#include <QLoggingCategory>
 #include <QQuickItem>
 #include <QUrl>
 #include <QVector>
 
+Q_DECLARE_LOGGING_CATEGORY(lcMdk)
+Q_DECLARE_LOGGING_CATEGORY(lcMdkRenderer)
+Q_DECLARE_LOGGING_CATEGORY(lcMdkD3D12Renderer)
+Q_DECLARE_LOGGING_CATEGORY(lcMdkD3D11Renderer)
+Q_DECLARE_LOGGING_CATEGORY(lcMdkVulkanRenderer)
+Q_DECLARE_LOGGING_CATEGORY(lcMdkMetalRenderer)
+Q_DECLARE_LOGGING_CATEGORY(lcMdkOpenGLRenderer)
+Q_DECLARE_LOGGING_CATEGORY(lcMdkPlayback)
+Q_DECLARE_LOGGING_CATEGORY(lcMdkMisc)
+
 namespace MDK_NS {
-class Player;
+QT_FORWARD_DECLARE_CLASS(Player)
 } // namespace MDK_NS
 
-class VideoTextureNode;
+QT_FORWARD_DECLARE_CLASS(VideoTextureNode)
 
 class MdkObject : public QQuickItem {
     Q_OBJECT
@@ -99,6 +110,9 @@ class MdkObject : public QQuickItem {
                    autoStartChanged)
     Q_PROPERTY(bool livePreview READ livePreview WRITE setLivePreview NOTIFY
                    livePreviewChanged)
+    Q_PROPERTY(VideoBackend videoBackend READ videoBackend CONSTANT)
+    Q_PROPERTY(FillMode fillMode READ fillMode WRITE setFillMode NOTIFY
+                   fillModeChanged)
 
 public:
     enum class PlaybackState { Stopped, Playing, Paused };
@@ -107,12 +121,15 @@ public:
     enum class MediaStatus {
         Unknown,
         NoMedia,
+        Unloaded,
         Loading,
         Loaded,
+        Prepared,
         Stalled,
         Buffering,
         Buffered,
         End,
+        Seeking,
         Invalid
     };
     Q_ENUM(MediaStatus)
@@ -127,6 +144,12 @@ public:
     using Chapters = QVector<ChapterInfo>;
 
     using MetaData = QHash<QString, QString>;
+
+    enum class VideoBackend { Unknown, D3D12, D3D11, Vulkan, Metal, OpenGL };
+    Q_ENUM(VideoBackend)
+
+    enum class FillMode { PreserveAspectFit, PreserveAspectCrop, Stretch };
+    Q_ENUM(FillMode)
 
     explicit MdkObject(QQuickItem *parent = nullptr);
     ~MdkObject() override;
@@ -143,7 +166,7 @@ public:
 
     qint64 duration() const;
 
-    QSize videoSize() const;
+    QSize videoSize(const bool _internalUse = false) const;
 
     qreal volume() const;
     void setVolume(const qreal value);
@@ -329,6 +352,12 @@ public:
     bool livePreview() const;
     void setLivePreview(const bool value);
 
+    // The video backend can't be changed at run-time.
+    VideoBackend videoBackend() const;
+
+    FillMode fillMode() const;
+    void setFillMode(const FillMode value);
+
 public Q_SLOTS:
     void open(const QUrl &value);
     void play();
@@ -350,6 +379,8 @@ public Q_SLOTS:
     bool currentIsVideo() const;
     bool currentIsAudio() const;
     bool currentIsMedia() const;
+    void startRecord(const QUrl &value, const QString &format = QString());
+    void stopRecord();
 
 protected:
     void timerEvent(QTimerEvent *event) override;
@@ -401,6 +432,7 @@ Q_SIGNALS:
     void audioBackendsChanged();
     void autoStartChanged();
     void livePreviewChanged();
+    void fillModeChanged();
 
 private:
     friend class VideoTextureNode;
@@ -418,6 +450,7 @@ private:
     MetaData m_metaData = {};
     QStringList m_videoDecoders = {}, m_audioDecoders = {},
                 m_audioBackends = {};
+    FillMode m_fillMode = FillMode::PreserveAspectFit;
 };
 
 Q_DECLARE_METATYPE(MdkObject::ChapterInfo)

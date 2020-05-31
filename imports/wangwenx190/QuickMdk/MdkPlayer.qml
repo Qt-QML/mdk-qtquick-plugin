@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import QtQuick 2.14
+import QtQuick 2.15
 import wangwenx190.QuickMdk 1.0
 
 Item {
@@ -67,6 +67,8 @@ Item {
     property alias audioBackends: mdkObject.audioBackends
     property alias autoStart: mdkObject.autoStart
     property alias livePreview: mdkObject.livePreview
+    property alias videoBackend: mdkObject.videoBackend
+    property alias fillMode: mdkObject.fillMode
 
     signal loaded
     signal playing
@@ -126,6 +128,12 @@ Item {
     }
     function currentIsMedia() {
         return mdkObject.currentIsMedia();
+    }
+    function startRecord(url, format) {
+        mdkObject.startRecord(url, format);
+    }
+    function stopRecord() {
+        mdkObject.stopRecord();
     }
 
     MdkObject {
