@@ -53,10 +53,14 @@
 
 Q_LOGGING_CATEGORY(lcMdk, "mdk.general")
 Q_LOGGING_CATEGORY(lcMdkRenderer, "mdk.renderer.general")
+#ifdef Q_OS_WINDOWS
 Q_LOGGING_CATEGORY(lcMdkD3D12Renderer, "mdk.renderer.d3d12")
 Q_LOGGING_CATEGORY(lcMdkD3D11Renderer, "mdk.renderer.d3d11")
+#endif
 Q_LOGGING_CATEGORY(lcMdkVulkanRenderer, "mdk.renderer.vulkan")
+#ifdef Q_OS_MACOS
 Q_LOGGING_CATEGORY(lcMdkMetalRenderer, "mdk.renderer.metal")
+#endif
 Q_LOGGING_CATEGORY(lcMdkOpenGLRenderer, "mdk.renderer.opengl")
 Q_LOGGING_CATEGORY(lcMdkPlayback, "mdk.playback")
 Q_LOGGING_CATEGORY(lcMdkMisc, "mdk.misc")
