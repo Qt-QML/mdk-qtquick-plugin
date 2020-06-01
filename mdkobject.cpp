@@ -986,9 +986,9 @@ bool MdkObject::isMedia(const QUrl &value) {
     return (isVideo(value) || isAudio(value));
 }
 
-bool MdkObject::currentIsVideo() const { return isVideo(source()); }
+bool MdkObject::currentIsVideo() const { return isVideo(m_source); }
 
-bool MdkObject::currentIsAudio() const { return isAudio(source()); }
+bool MdkObject::currentIsAudio() const { return isAudio(m_source); }
 
 bool MdkObject::currentIsMedia() const {
     return (currentIsVideo() || currentIsAudio());
