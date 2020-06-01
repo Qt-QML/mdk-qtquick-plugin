@@ -170,7 +170,7 @@ public:
 
     qint64 duration() const;
 
-    QSize videoSize(const bool _internalUse = false) const;
+    QSize videoSize() const;
 
     qreal volume() const;
     void setVolume(const qreal value);
@@ -398,8 +398,6 @@ private Q_SLOTS:
 private:
     void releaseResources() override;
     void initMdkHandlers();
-    void videoReConfig();
-    void audioReConfig();
 
 Q_SIGNALS:
     void loaded();

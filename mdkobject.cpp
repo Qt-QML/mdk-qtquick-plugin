@@ -62,8 +62,8 @@ Q_LOGGING_CATEGORY(lcMdkVulkanRenderer, "mdk.renderer.vulkan")
 Q_LOGGING_CATEGORY(lcMdkMetalRenderer, "mdk.renderer.metal")
 #endif
 Q_LOGGING_CATEGORY(lcMdkOpenGLRenderer, "mdk.renderer.opengl")
-Q_LOGGING_CATEGORY(lcMdkPlayback, "mdk.playback")
-Q_LOGGING_CATEGORY(lcMdkMisc, "mdk.misc")
+Q_LOGGING_CATEGORY(lcMdkPlayback, "mdk.playback.general")
+Q_LOGGING_CATEGORY(lcMdkMisc, "mdk.misc.general")
 
 #ifndef QT_NO_DEBUG_STREAM
 QDebug operator<<(QDebug d, const MdkObject::Chapters &chapters) {
@@ -378,9 +378,13 @@ void MdkObject::geometryChanged(const QRectF &newGeometry,
     }
 }
 
-QUrl MdkObject::source() const { return isStopped() ? QUrl() : m_source; }
+QUrl MdkObject::source() const { return m_source; }
 
 void MdkObject::setSource(const QUrl &value) {
+    if (value.isEmpty()) {
+        stop();
+        return;
+    }
     if (!value.isValid() || (value == m_source) || !isMedia(value)) {
         return;
     }
@@ -394,6 +398,8 @@ void MdkObject::setSource(const QUrl &value) {
         m_source.isLocalFile()
             ? qUtf8Printable(QDir::toNativeSeparators(m_source.toLocalFile()))
             : qUtf8Printable(m_source.url()));
+    // prepare means preload, mediaInfo is parsed but the media file is not
+    // loaded and played.
     m_player->prepare(0, [this](int64_t position, bool * /*unused*/) {
         Q_UNUSED(position)
         const auto &info = m_player->mediaInfo();
@@ -403,10 +409,11 @@ void MdkObject::setSource(const QUrl &value) {
         m_hasChapters = !info.chapters.empty();
         m_hasMetaData = !info.metadata.empty();
         if (m_hasVideo) {
-            videoReConfig();
+            Q_EMIT videoSizeChanged();
+            qCDebug(lcMdkPlayback).noquote() << "Video size -->" << videoSize();
         }
         if (m_hasAudio) {
-            audioReConfig();
+            // ### TODO
         }
         // ### TODO: if (m_hasSubtitle) { ... }
         if (m_hasChapters) {
@@ -432,41 +439,41 @@ void MdkObject::setSource(const QUrl &value) {
             Q_EMIT metaDataChanged();
             qCDebug(lcMdkMisc).noquote() << "Meta data -->" << m_metaData;
         }
-        qCDebug(lcMdkPlayback).noquote() << "Loaded.";
+        Q_EMIT positionChanged();
+        Q_EMIT durationChanged();
+        Q_EMIT seekableChanged();
+        Q_EMIT formatChanged();
+        Q_EMIT fileSizeChanged();
+        Q_EMIT bitRateChanged();
+        qCDebug(lcMdkPlayback).noquote() << "Preloaded.";
+        // Return false means only acquire the media information, not start
+        // playback.
         return true;
     });
+    Q_EMIT sourceChanged();
     if (autoStart() && !livePreview()) {
         m_player->setState(MDK_NS::PlaybackState::Playing);
         m_player->waitFor(MDK_NS::PlaybackState::Playing);
     }
-    Q_EMIT sourceChanged();
-    Q_EMIT positionChanged();
-    Q_EMIT durationChanged();
-    Q_EMIT seekableChanged();
-    Q_EMIT formatChanged();
-    Q_EMIT fileSizeChanged();
-    Q_EMIT bitRateChanged();
     Q_EMIT loaded();
 }
 
 QString MdkObject::fileName() const {
-    return (!isStopped() && m_source.isValid())
+    return m_source.isValid()
         ? (m_source.isLocalFile() ? m_source.fileName()
                                   : m_source.toDisplayString())
         : QString();
 }
 
 QString MdkObject::path() const {
-    return (!isStopped() && m_source.isValid())
+    return m_source.isValid()
         ? (m_source.isLocalFile()
                ? QDir::toNativeSeparators(m_source.toLocalFile())
                : m_source.toDisplayString())
         : QString();
 }
 
-qint64 MdkObject::position() const {
-    return isStopped() ? 0 : m_player->position();
-}
+qint64 MdkObject::position() const { return m_player->position(); }
 
 void MdkObject::setPosition(const qint64 value) {
     if (isStopped() || (value == position())) {
@@ -475,14 +482,9 @@ void MdkObject::setPosition(const qint64 value) {
     seek(value);
 }
 
-qint64 MdkObject::duration() const {
-    return isStopped() ? 0 : m_player->mediaInfo().duration;
-}
+qint64 MdkObject::duration() const { return m_player->mediaInfo().duration; }
 
-QSize MdkObject::videoSize(const bool _internalUse) const {
-    if (isStopped() && !_internalUse) {
-        return {};
-    }
+QSize MdkObject::videoSize() const {
     const auto &codec = m_player->mediaInfo().video.at(0).codec;
     return QSize(codec.width, codec.height);
 }
@@ -513,7 +515,7 @@ void MdkObject::setMute(const bool value) {
 
 bool MdkObject::seekable() const {
     // Local files are always seekable, in theory.
-    return (isLoaded() && m_source.isLocalFile());
+    return m_source.isLocalFile();
 }
 
 MdkObject::PlaybackState MdkObject::playbackState() const {
@@ -621,7 +623,7 @@ void MdkObject::setLogLevel(const MdkObject::LogLevel value) {
 }
 
 qreal MdkObject::playbackRate() const {
-    return isStopped() ? 1.0 : static_cast<qreal>(m_player->playbackRate());
+    return static_cast<qreal>(m_player->playbackRate());
 }
 
 void MdkObject::setPlaybackRate(const qreal value) {
@@ -634,9 +636,6 @@ void MdkObject::setPlaybackRate(const qreal value) {
 }
 
 qreal MdkObject::aspectRatio() const {
-    if (isStopped()) {
-        return 0.0;
-    }
     const auto &codec = m_player->mediaInfo().video.at(0).codec;
     return (static_cast<qreal>(codec.width) / static_cast<qreal>(codec.height));
 }
@@ -699,34 +698,21 @@ QStringList MdkObject::audioMimeTypes() {
     return suffixesToMimeTypes(audioSuffixes());
 }
 
-QString MdkObject::positionText() const {
-    return isStopped() ? QString() : timeToString(position());
-}
+QString MdkObject::positionText() const { return timeToString(position()); }
 
-QString MdkObject::durationText() const {
-    return isStopped() ? QString() : timeToString(duration());
-}
+QString MdkObject::durationText() const { return timeToString(duration()); }
 
 QString MdkObject::format() const {
-    return isStopped() ? QString()
-                       : QString::fromUtf8(m_player->mediaInfo().format);
+    return QString::fromUtf8(m_player->mediaInfo().format);
 }
 
-qint64 MdkObject::fileSize() const {
-    return isStopped() ? 0 : m_player->mediaInfo().size;
-}
+qint64 MdkObject::fileSize() const { return m_player->mediaInfo().size; }
 
-qint64 MdkObject::bitRate() const {
-    return isStopped() ? 0 : m_player->mediaInfo().bit_rate;
-}
+qint64 MdkObject::bitRate() const { return m_player->mediaInfo().bit_rate; }
 
-MdkObject::Chapters MdkObject::chapters() const {
-    return isStopped() ? Chapters{} : m_chapters;
-}
+MdkObject::Chapters MdkObject::chapters() const { return m_chapters; }
 
-MdkObject::MetaData MdkObject::metaData() const {
-    return isStopped() ? MetaData{} : m_metaData;
-}
+MdkObject::MetaData MdkObject::metaData() const { return m_metaData; }
 
 bool MdkObject::hardwareDecoding() const { return m_hardwareDecoding; }
 
@@ -802,6 +788,9 @@ void MdkObject::setLivePreview(const bool value) {
     if (m_livePreview != value) {
         m_livePreview = value;
         if (m_livePreview) {
+            // Disable log output, otherwise they'll mix up with the real
+            // player.
+            MDK_NS::setLogLevel(MDK_NS::LogLevel::Off);
             // We only need static images.
             m_player->setState(MDK_NS::PlaybackState::Paused);
             // We don't want the preview window play sound.
@@ -815,9 +804,11 @@ void MdkObject::setLivePreview(const bool value) {
             // Restore everything to default.
             m_player->setBufferRange(4000, 16000, false);
             m_player->setMute(m_mute);
+            MDK_NS::setLogLevel(MDK_NS::LogLevel::Debug);
         }
         Q_EMIT livePreviewChanged();
-        qCDebug(lcMdkPlayback).noquote() << "Live preview -->" << m_livePreview;
+        // qCDebug(lcMdkPlayback).noquote() << "Live preview -->" <<
+        // m_livePreview;
     }
 }
 
@@ -934,7 +925,9 @@ void MdkObject::seek(const qint64 value) {
     m_player->seek(value,
                    m_livePreview ? MDK_NS::SeekFlag::FromStart
                                  : MDK_NS::SeekFlag::Default);
-    qCDebug(lcMdkPlayback).noquote() << "Seek -->" << value;
+    if (!m_livePreview) {
+        qCDebug(lcMdkPlayback).noquote() << "Seek -->" << value;
+    }
 }
 
 void MdkObject::rotateImage(const int value) {
@@ -993,16 +986,12 @@ bool MdkObject::isMedia(const QUrl &value) {
     return (isVideo(value) || isAudio(value));
 }
 
-bool MdkObject::currentIsVideo() const {
-    return isStopped() ? false : isVideo(source());
-}
+bool MdkObject::currentIsVideo() const { return isVideo(source()); }
 
-bool MdkObject::currentIsAudio() const {
-    return isStopped() ? false : isAudio(source());
-}
+bool MdkObject::currentIsAudio() const { return isAudio(source()); }
 
 bool MdkObject::currentIsMedia() const {
-    return isStopped() ? false : (currentIsVideo() || currentIsAudio());
+    return (currentIsVideo() || currentIsAudio());
 }
 
 void MdkObject::startRecord(const QUrl &value, const QString &format) {
@@ -1022,7 +1011,9 @@ void MdkObject::stopRecord() {
 
 void MdkObject::timerEvent(QTimerEvent *event) {
     QQuickItem::timerEvent(event);
-    Q_EMIT positionChanged();
+    if (!isStopped()) {
+        Q_EMIT positionChanged();
+    }
 }
 
 void MdkObject::initMdkHandlers() {
@@ -1081,17 +1072,6 @@ void MdkObject::initMdkHandlers() {
             qCDebug(lcMdkPlayback).noquote() << "Stopped.";
         }
     });
-}
-
-void MdkObject::videoReConfig() {
-    qCDebug(lcMdkPlayback).noquote() << "Video re-configured.";
-    Q_EMIT videoSizeChanged();
-    qCDebug(lcMdkPlayback).noquote() << "Video size -->" << videoSize(true);
-}
-
-void MdkObject::audioReConfig() {
-    qCDebug(lcMdkPlayback).noquote() << "Audio re-configured.";
-    // ### TODO
 }
 
 bool MdkObject::isLoaded() const { return !isStopped(); }
