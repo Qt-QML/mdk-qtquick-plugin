@@ -52,6 +52,7 @@
 #endif
 
 Q_LOGGING_CATEGORY(lcMdk, "mdk.general")
+Q_LOGGING_CATEGORY(lcMdkLog, "mdk.log.general")
 Q_LOGGING_CATEGORY(lcMdkRenderer, "mdk.renderer.general")
 #ifdef Q_OS_WINDOWS
 Q_LOGGING_CATEGORY(lcMdkD3D12Renderer, "mdk.renderer.d3d12")
@@ -141,7 +142,10 @@ public:
                         m_item->update();
                     }
                 });
-        qCDebug(lcMdkRenderer).noquote() << "Renderer created.";
+        m_livePreview = item->m_livePreview;
+        if (!m_livePreview) {
+            qCDebug(lcMdkRenderer).noquote() << "Renderer created.";
+        }
     }
 
     ~VideoTextureNode() override {
@@ -150,7 +154,9 @@ public:
 #if QT_CONFIG(opengl)
         fbo_gl.reset();
 #endif
-        qCDebug(lcMdkRenderer).noquote() << "Renderer destroyed.";
+        if (!m_livePreview) {
+            qCDebug(lcMdkRenderer).noquote() << "Renderer destroyed.";
+        }
     }
 
     QSGTexture *texture() const override {
@@ -190,8 +196,10 @@ public:
                 D3D11_USAGE_DEFAULT, 0, 1, 0, 0);
             if (FAILED(
                     dev->CreateTexture2D(&desc, nullptr, &m_texture_d3d11))) {
-                qCCritical(lcMdkD3D11Renderer).noquote()
-                    << "Failed to create 2D texture!";
+                if (!m_livePreview) {
+                    qCCritical(lcMdkD3D11Renderer).noquote()
+                        << "Failed to create 2D texture!";
+                }
             }
             QSGTexture *wrapper = m_window->createTextureFromNativeObject(
                 QQuickWindow::NativeObjectTexture,
@@ -254,9 +262,11 @@ public:
 #endif
         } break;
         default:
-            qCCritical(lcMdkRenderer).noquote()
-                << "QSGRendererInterface reports unknown graphics API:"
-                << rif->graphicsApi();
+            if (!m_livePreview) {
+                qCCritical(lcMdkRenderer).noquote()
+                    << "QSGRendererInterface reports unknown graphics API:"
+                    << rif->graphicsApi();
+            }
             break;
         }
         player->setVideoSurfaceSize(m_size.width(), m_size.height());
@@ -291,6 +301,7 @@ private Q_SLOTS:
     }
 
 private:
+    bool m_livePreview = false;
     QQuickItem *m_item = nullptr;
     QQuickWindow *m_window = nullptr;
     QSize m_size = {};
@@ -313,7 +324,9 @@ MdkObject::MdkObject(QQuickItem *parent) : QQuickItem(parent) {
     qputenv("MDK_LOG_STATUS", "0");
     m_player.reset(new MDK_NS::Player);
     Q_ASSERT(!m_player.isNull());
-    qCDebug(lcMdk).noquote() << "Player created.";
+    if (!m_livePreview) {
+        qCDebug(lcMdk).noquote() << "Player created.";
+    }
     setFlag(ItemHasContents, true);
     qRegisterMetaType<ChapterInfo>();
     m_player->setRenderCallback(
@@ -333,7 +346,11 @@ MdkObject::MdkObject(QQuickItem *parent) : QQuickItem(parent) {
     startTimer(50);
 }
 
-MdkObject::~MdkObject() { qCDebug(lcMdk).noquote() << "Player destroyed."; }
+MdkObject::~MdkObject() {
+    if (!m_livePreview) {
+        qCDebug(lcMdk).noquote() << "Player destroyed.";
+    }
+}
 
 // The beauty of using a true QSGNode: no need for complicated cleanup
 // arrangements, unlike in other examples like metalunderqml, because the
@@ -341,13 +358,17 @@ MdkObject::~MdkObject() { qCDebug(lcMdk).noquote() << "Player destroyed."; }
 // Called on the render thread when the scenegraph is invalidated.
 void MdkObject::invalidateSceneGraph() {
     m_node = nullptr;
-    qCDebug(lcMdkRenderer).noquote() << "Scenegraph invalidated.";
+    if (!m_livePreview) {
+        qCDebug(lcMdkRenderer).noquote() << "Scenegraph invalidated.";
+    }
 }
 
 // Called on the gui thread if the item is removed from scene.
 void MdkObject::releaseResources() {
     m_node = nullptr;
-    qCDebug(lcMdkRenderer).noquote() << "Resources released.";
+    if (!m_livePreview) {
+        qCDebug(lcMdkRenderer).noquote() << "Resources released.";
+    }
 }
 
 QSGNode *MdkObject::updatePaintNode(QSGNode *node, UpdatePaintNodeData *data) {
@@ -366,7 +387,6 @@ QSGNode *MdkObject::updatePaintNode(QSGNode *node, UpdatePaintNodeData *data) {
     n->setRect(0, 0, width(), height());
     // Ensure getting to beforeRendering() at some point.
     window()->update();
-    // qCDebug(lcMdkRenderer).noquote() << "Paint node updated.";
     return n;
 }
 
@@ -400,8 +420,12 @@ void MdkObject::setSource(const QUrl &value) {
             : qUtf8Printable(m_source.url()));
     // prepare means preload, mediaInfo is parsed but the media file is not
     // loaded and played.
-    m_player->prepare(0, [this](int64_t position, bool * /*unused*/) {
+    m_player->prepare(0, [this](int64_t position, bool *boost) {
+        // If position is given, playback will start from that position instead
+        // of the beginning of the media.
         Q_UNUSED(position)
+        // If boost is false, the first frame won't be shown.
+        Q_UNUSED(boost)
         const auto &info = m_player->mediaInfo();
         m_hasVideo = !info.video.empty();
         m_hasAudio = !info.audio.empty();
@@ -410,7 +434,10 @@ void MdkObject::setSource(const QUrl &value) {
         m_hasMetaData = !info.metadata.empty();
         if (m_hasVideo) {
             Q_EMIT videoSizeChanged();
-            qCDebug(lcMdkPlayback).noquote() << "Video size -->" << videoSize();
+            if (!m_livePreview) {
+                qCDebug(lcMdkPlayback).noquote()
+                    << "Video size -->" << videoSize();
+            }
         }
         if (m_hasAudio) {
             // ### TODO
@@ -427,7 +454,9 @@ void MdkObject::setSource(const QUrl &value) {
                 m_chapters.append(info);
             }
             Q_EMIT chaptersChanged();
-            qCDebug(lcMdkMisc).noquote() << "Chapters -->" << m_chapters;
+            if (!m_livePreview) {
+                qCDebug(lcMdkMisc).noquote() << "Chapters -->" << m_chapters;
+            }
         }
         if (m_hasMetaData) {
             m_metaData.clear();
@@ -437,7 +466,9 @@ void MdkObject::setSource(const QUrl &value) {
                                   QString::fromStdString(data.second));
             }
             Q_EMIT metaDataChanged();
-            qCDebug(lcMdkMisc).noquote() << "Meta data -->" << m_metaData;
+            if (!m_livePreview) {
+                qCDebug(lcMdkMisc).noquote() << "Meta data -->" << m_metaData;
+            }
         }
         Q_EMIT positionChanged();
         Q_EMIT durationChanged();
@@ -445,7 +476,9 @@ void MdkObject::setSource(const QUrl &value) {
         Q_EMIT formatChanged();
         Q_EMIT fileSizeChanged();
         Q_EMIT bitRateChanged();
-        qCDebug(lcMdkPlayback).noquote() << "Preloaded.";
+        if (!m_livePreview) {
+            qCDebug(lcMdkPlayback).noquote() << "Preloaded.";
+        }
         // Return false means only acquire the media information, not start
         // playback.
         return true;
@@ -498,7 +531,9 @@ void MdkObject::setVolume(const qreal value) {
     m_volume = value;
     m_player->setVolume(m_volume);
     Q_EMIT volumeChanged();
-    qCDebug(lcMdkPlayback).noquote() << "Volume -->" << m_volume;
+    if (!m_livePreview) {
+        qCDebug(lcMdkPlayback).noquote() << "Volume -->" << m_volume;
+    }
 }
 
 bool MdkObject::mute() const { return m_mute; }
@@ -510,7 +545,9 @@ void MdkObject::setMute(const bool value) {
     m_mute = value;
     m_player->setMute(m_mute);
     Q_EMIT muteChanged();
-    qCDebug(lcMdkPlayback).noquote() << "Mute -->" << m_mute;
+    if (!m_livePreview) {
+        qCDebug(lcMdkPlayback).noquote() << "Mute -->" << m_mute;
+    }
 }
 
 bool MdkObject::seekable() const {
@@ -619,7 +656,9 @@ void MdkObject::setLogLevel(const MdkObject::LogLevel value) {
         break;
     }
     Q_EMIT logLevelChanged();
-    qCDebug(lcMdkMisc).noquote() << "Log level -->" << value;
+    if (!m_livePreview) {
+        qCDebug(lcMdkMisc).noquote() << "Log level -->" << value;
+    }
 }
 
 qreal MdkObject::playbackRate() const {
@@ -632,7 +671,9 @@ void MdkObject::setPlaybackRate(const qreal value) {
     }
     m_player->setPlaybackRate(value);
     Q_EMIT playbackRateChanged();
-    qCDebug(lcMdkPlayback).noquote() << "Playback rate -->" << value;
+    if (!m_livePreview) {
+        qCDebug(lcMdkPlayback).noquote() << "Playback rate -->" << value;
+    }
 }
 
 qreal MdkObject::aspectRatio() const {
@@ -646,7 +687,9 @@ void MdkObject::setAspectRatio(const qreal value) {
     }
     m_player->setAspectRatio(value);
     Q_EMIT aspectRatioChanged();
-    qCDebug(lcMdkPlayback).noquote() << "Aspect ratio -->" << value;
+    if (!m_livePreview) {
+        qCDebug(lcMdkPlayback).noquote() << "Aspect ratio -->" << value;
+    }
 }
 
 QString MdkObject::snapshotDirectory() const {
@@ -663,8 +706,10 @@ void MdkObject::setSnapshotDirectory(const QString &value) {
     }
     m_snapshotDirectory = val;
     Q_EMIT snapshotDirectoryChanged();
-    qCDebug(lcMdkMisc).noquote()
-        << "Snapshot directory -->" << m_snapshotDirectory;
+    if (!m_livePreview) {
+        qCDebug(lcMdkMisc).noquote()
+            << "Snapshot directory -->" << m_snapshotDirectory;
+    }
 }
 
 QString MdkObject::snapshotFormat() const { return m_snapshotFormat; }
@@ -675,7 +720,10 @@ void MdkObject::setSnapshotFormat(const QString &value) {
     }
     m_snapshotFormat = value;
     Q_EMIT snapshotFormatChanged();
-    qCDebug(lcMdkMisc).noquote() << "Snapshot format -->" << m_snapshotFormat;
+    if (!m_livePreview) {
+        qCDebug(lcMdkMisc).noquote()
+            << "Snapshot format -->" << m_snapshotFormat;
+    }
 }
 
 QString MdkObject::snapshotTemplate() const { return m_snapshotTemplate; }
@@ -686,8 +734,10 @@ void MdkObject::setSnapshotTemplate(const QString &value) {
     }
     m_snapshotTemplate = value;
     Q_EMIT snapshotTemplateChanged();
-    qCDebug(lcMdkMisc).noquote()
-        << "Snapshot template -->" << m_snapshotTemplate;
+    if (!m_livePreview) {
+        qCDebug(lcMdkMisc).noquote()
+            << "Snapshot template -->" << m_snapshotTemplate;
+    }
 }
 
 QStringList MdkObject::videoMimeTypes() {
@@ -725,8 +775,10 @@ void MdkObject::setHardwareDecoding(const bool value) {
             setVideoDecoders({QString::fromUtf8("FFmpeg")});
         }
         Q_EMIT hardwareDecodingChanged();
-        qCDebug(lcMdkPlayback).noquote()
-            << "Hardware decoding -->" << m_hardwareDecoding;
+        if (!m_livePreview) {
+            qCDebug(lcMdkPlayback).noquote()
+                << "Hardware decoding -->" << m_hardwareDecoding;
+        }
     }
 }
 
@@ -739,8 +791,10 @@ void MdkObject::setVideoDecoders(const QStringList &value) {
         m_player->setVideoDecoders(
             qStringListToStdStringVector(m_videoDecoders));
         Q_EMIT videoDecodersChanged();
-        qCDebug(lcMdkPlayback).noquote()
-            << "Video decoders -->" << m_videoDecoders;
+        if (!m_livePreview) {
+            qCDebug(lcMdkPlayback).noquote()
+                << "Video decoders -->" << m_videoDecoders;
+        }
     }
 }
 
@@ -753,8 +807,10 @@ void MdkObject::setAudioDecoders(const QStringList &value) {
         m_player->setAudioDecoders(
             qStringListToStdStringVector(m_audioDecoders));
         Q_EMIT audioDecodersChanged();
-        qCDebug(lcMdkPlayback).noquote()
-            << "Audio decoders -->" << m_audioDecoders;
+        if (!m_livePreview) {
+            qCDebug(lcMdkPlayback).noquote()
+                << "Audio decoders -->" << m_audioDecoders;
+        }
     }
 }
 
@@ -767,8 +823,10 @@ void MdkObject::setAudioBackends(const QStringList &value) {
         m_player->setAudioBackends(
             qStringListToStdStringVector(m_audioBackends));
         Q_EMIT audioBackendsChanged();
-        qCDebug(lcMdkPlayback).noquote()
-            << "Audio backends -->" << m_audioBackends;
+        if (!m_livePreview) {
+            qCDebug(lcMdkPlayback).noquote()
+                << "Audio backends -->" << m_audioBackends;
+        }
     }
 }
 
@@ -778,7 +836,9 @@ void MdkObject::setAutoStart(const bool value) {
     if (m_autoStart != value) {
         m_autoStart = value;
         Q_EMIT autoStartChanged();
-        qCDebug(lcMdkPlayback).noquote() << "Auto start -->" << m_autoStart;
+        if (!m_livePreview) {
+            qCDebug(lcMdkPlayback).noquote() << "Auto start -->" << m_autoStart;
+        }
     }
 }
 
@@ -807,8 +867,6 @@ void MdkObject::setLivePreview(const bool value) {
             MDK_NS::setLogLevel(MDK_NS::LogLevel::Debug);
         }
         Q_EMIT livePreviewChanged();
-        // qCDebug(lcMdkPlayback).noquote() << "Live preview -->" <<
-        // m_livePreview;
     }
 }
 
@@ -850,7 +908,9 @@ void MdkObject::setFillMode(const MdkObject::FillMode value) {
             break;
         }
         Q_EMIT fillModeChanged();
-        qCDebug(lcMdkPlayback).noquote() << "Fill mode -->" << m_fillMode;
+        if (!m_livePreview) {
+            qCDebug(lcMdkPlayback).noquote() << "Fill mode -->" << m_fillMode;
+        }
     }
 }
 
@@ -935,7 +995,9 @@ void MdkObject::rotateImage(const int value) {
         return;
     }
     m_player->rotate(value);
-    qCDebug(lcMdkMisc).noquote() << "Rotate -->" << value;
+    if (!m_livePreview) {
+        qCDebug(lcMdkMisc).noquote() << "Rotate -->" << value;
+    }
 }
 
 void MdkObject::scaleImage(const qreal x, const qreal y) {
@@ -943,7 +1005,9 @@ void MdkObject::scaleImage(const qreal x, const qreal y) {
         return;
     }
     m_player->scale(x, y);
-    qCDebug(lcMdkMisc).noquote() << "Scale -->" << QSizeF{x, y};
+    if (!m_livePreview) {
+        qCDebug(lcMdkMisc).noquote() << "Scale -->" << QSizeF{x, y};
+    }
 }
 
 void MdkObject::snapshot() {
@@ -959,7 +1023,9 @@ void MdkObject::snapshot() {
                 QString::fromUtf8("%1%2%3.%4")
                     .arg(snapshotDirectory(), QDir::separator(),
                          QString::number(frameTime), snapshotFormat());
-            qCDebug(lcMdkMisc).noquote() << "Snapshot -->" << path;
+            if (!m_livePreview) {
+                qCDebug(lcMdkMisc).noquote() << "Snapshot -->" << path;
+            }
             return path.toStdString();
         });
 }
@@ -1000,13 +1066,17 @@ void MdkObject::startRecord(const QUrl &value, const QString &format) {
         const QString path = QDir::toNativeSeparators(value.toLocalFile());
         m_player->record(qUtf8Printable(path),
                          format.isEmpty() ? nullptr : qUtf8Printable(format));
-        qCDebug(lcMdkMisc).noquote() << "Start recording -->" << path;
+        if (!m_livePreview) {
+            qCDebug(lcMdkMisc).noquote() << "Start recording -->" << path;
+        }
     }
 }
 
 void MdkObject::stopRecord() {
     m_player->record();
-    qCDebug(lcMdkMisc).noquote() << "Recording stopped.";
+    if (!m_livePreview) {
+        qCDebug(lcMdkMisc).noquote() << "Recording stopped.";
+    }
 }
 
 void MdkObject::timerEvent(QTimerEvent *event) {
@@ -1018,42 +1088,54 @@ void MdkObject::timerEvent(QTimerEvent *event) {
 
 void MdkObject::initMdkHandlers() {
     MDK_NS::setLogHandler([](MDK_NS::LogLevel level, const char *msg) {
+        if (m_livePreview) {
+            return;
+        }
         switch (level) {
         case MDK_NS::LogLevel::Info:
-            qCInfo(lcMdk).noquote() << msg;
+            qCInfo(lcMdkLog).noquote() << msg;
             break;
         case MDK_NS::LogLevel::All:
         case MDK_NS::LogLevel::Debug:
-            qCDebug(lcMdk).noquote() << msg;
+            qCDebug(lcMdkLog).noquote() << msg;
             break;
         case MDK_NS::LogLevel::Warning:
-            qCWarning(lcMdk).noquote() << msg;
+            qCWarning(lcMdkLog).noquote() << msg;
             break;
         case MDK_NS::LogLevel::Error:
-            qCCritical(lcMdk).noquote() << msg;
+            qCCritical(lcMdkLog).noquote() << msg;
             break;
         default:
             break;
         }
     });
     m_player->currentMediaChanged([this] {
-        qCDebug(lcMdkPlayback).noquote()
-            << "Current media -->" << m_player->url();
+        if (!m_livePreview) {
+            qCDebug(lcMdkPlayback).noquote()
+                << "Current media -->" << m_player->url();
+        }
         Q_EMIT sourceChanged();
     });
     m_player->onMediaStatusChanged([this](MDK_NS::MediaStatus s) {
         Q_UNUSED(s)
         Q_EMIT mediaStatusChanged();
-        qCDebug(lcMdkPlayback).noquote() << "Media status -->" << mediaStatus();
+        if (!m_livePreview) {
+            qCDebug(lcMdkPlayback).noquote()
+                << "Media status -->" << mediaStatus();
+        }
         return true;
     });
     m_player->onEvent([](const MDK_NS::MediaEvent &e) {
-        qCDebug(lcMdk).noquote()
-            << "MDK event:" << e.category.data() << e.detail.data();
+        if (!m_livePreview) {
+            qCDebug(lcMdk).noquote()
+                << "MDK event:" << e.category.data() << e.detail.data();
+        }
         return false;
     });
     m_player->onLoop([](int count) {
-        qCDebug(lcMdkPlayback).noquote() << "loop:" << count;
+        if (!m_livePreview) {
+            qCDebug(lcMdkPlayback).noquote() << "loop:" << count;
+        }
         return false;
     });
     m_player->onStateChanged([this](MDK_NS::PlaybackState s) {
@@ -1061,15 +1143,21 @@ void MdkObject::initMdkHandlers() {
         Q_EMIT playbackStateChanged();
         if (isPlaying()) {
             Q_EMIT playing();
-            qCDebug(lcMdkPlayback).noquote() << "Start playing.";
+            if (!m_livePreview) {
+                qCDebug(lcMdkPlayback).noquote() << "Start playing.";
+            }
         }
         if (isPaused()) {
             Q_EMIT paused();
-            qCDebug(lcMdkPlayback).noquote() << "Paused.";
+            if (!m_livePreview) {
+                qCDebug(lcMdkPlayback).noquote() << "Paused.";
+            }
         }
         if (isStopped()) {
             Q_EMIT stopped();
-            qCDebug(lcMdkPlayback).noquote() << "Stopped.";
+            if (!m_livePreview) {
+                qCDebug(lcMdkPlayback).noquote() << "Stopped.";
+            }
         }
     });
 }
