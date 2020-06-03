@@ -1087,7 +1087,7 @@ void MdkObject::timerEvent(QTimerEvent *event) {
 }
 
 void MdkObject::initMdkHandlers() {
-    MDK_NS::setLogHandler([](MDK_NS::LogLevel level, const char *msg) {
+    MDK_NS::setLogHandler([this](MDK_NS::LogLevel level, const char *msg) {
         if (m_livePreview) {
             return;
         }
@@ -1125,14 +1125,14 @@ void MdkObject::initMdkHandlers() {
         }
         return true;
     });
-    m_player->onEvent([](const MDK_NS::MediaEvent &e) {
+    m_player->onEvent([this](const MDK_NS::MediaEvent &e) {
         if (!m_livePreview) {
             qCDebug(lcMdk).noquote()
                 << "MDK event:" << e.category.data() << e.detail.data();
         }
         return false;
     });
-    m_player->onLoop([](int count) {
+    m_player->onLoop([this](int count) {
         if (!m_livePreview) {
             qCDebug(lcMdkPlayback).noquote() << "loop:" << count;
         }
