@@ -26,7 +26,6 @@
 
 #include "mdk/global.h"
 #include <QHash>
-#include <QList>
 #include <QLoggingCategory>
 #include <QQuickItem>
 #include <QUrl>
