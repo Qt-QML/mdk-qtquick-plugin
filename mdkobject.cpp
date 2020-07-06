@@ -126,6 +126,15 @@ std::vector<std::string> qStringListToStdStringVector(const QStringList &stringL
     return result;
 }
 
+QString urlToString(const QUrl &value, const bool display = false)
+{
+    if (!value.isValid()) {
+        return {};
+    }
+    return (value.isLocalFile() ? QDir::toNativeSeparators(value.toLocalFile())
+                                : (display ? value.toDisplayString() : value.url()));
+}
+
 } // namespace
 
 class VideoTextureNode : public QSGTextureProvider, public QSGSimpleTextureNode
@@ -437,9 +446,7 @@ void MdkObject::setUrl(const QUrl &value)
     //advance(value);
     // The first url may be the same as current url.
     m_player->setMedia(nullptr);
-    m_player->setMedia(value.isLocalFile()
-                           ? qUtf8Printable(QDir::toNativeSeparators(value.toLocalFile()))
-                           : qUtf8Printable(value.url()));
+    m_player->setMedia(qUtf8Printable(urlToString(value)));
     Q_EMIT urlChanged();
     m_player->prepare();
     if (autoStart() && !livePreview()) {
@@ -501,9 +508,7 @@ QString MdkObject::fileName() const
 QString MdkObject::path() const
 {
     const QUrl source = url();
-    return source.isValid() ? (source.isLocalFile() ? QDir::toNativeSeparators(source.toLocalFile())
-                                                    : source.toDisplayString())
-                            : QString();
+    return source.isValid() ? urlToString(source, true) : QString();
 }
 
 qint64 MdkObject::position() const
@@ -1189,7 +1194,7 @@ void MdkObject::startRecording(const QUrl &value, const QString &format)
 {
     if (value.isValid() && value.isLocalFile()) {
         // If media is not loaded, recorder will start when playback starts.
-        const QString path = QDir::toNativeSeparators(value.toLocalFile());
+        const QString path = urlToString(value);
         m_player->record(qUtf8Printable(path), format.isEmpty() ? nullptr : qUtf8Printable(format));
         if (!m_livePreview) {
             qCDebug(lcMdkMisc).noquote() << "Start recording -->" << path;
@@ -1244,10 +1249,7 @@ void MdkObject::initMdkHandlers()
         }
         advance(now);
         if (!m_livePreview) {
-            qCDebug(lcMdkPlayback).noquote()
-                << "Current media -->"
-                << (now.isLocalFile() ? QDir::toNativeSeparators(now.toLocalFile())
-                                      : now.toDisplayString());
+            qCDebug(lcMdkPlayback).noquote() << "Current media -->" << urlToString(now, true);
         }
         Q_EMIT urlChanged();
     });
@@ -1428,9 +1430,7 @@ void MdkObject::advance(const QUrl &value)
     }
     const QUrl nextUrl = *m_next_it;
     if (nextUrl.isValid()) {
-        m_player->setNextMedia(nextUrl.isLocalFile()
-                                   ? qUtf8Printable(QDir::toNativeSeparators(nextUrl.toLocalFile()))
-                                   : qUtf8Printable(nextUrl.url()));
+        m_player->setNextMedia(qUtf8Printable(urlToString(nextUrl)));
     }
     advance();
 }
