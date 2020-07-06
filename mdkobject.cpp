@@ -33,8 +33,9 @@
 #include <Metal/Metal.h>
 #endif
 
-#include "mdk/Player.h"
-#include "mdk/RenderAPI.h"
+#include <mdk/Player.h>
+#include <mdk/RenderAPI.h>
+#include <mdkloader.h>
 #include <QDebug>
 #include <QDir>
 #include <QFileInfo>
@@ -73,7 +74,7 @@ QDebug operator<<(QDebug d, const MdkObject::Chapters &chapters)
     QDebugStateSaver saver(d);
     d.nospace();
     d.noquote();
-    QString chaptersStr = QString();
+    QString chaptersStr = {};
     for (auto &&chapter : qAsConst(chapters)) {
         chaptersStr.append(QString::fromUtf8("(title: %1, beginTime: %2, endTime: %3)")
                                .arg(chapter.title,
@@ -185,13 +186,14 @@ public:
             return;
         }
         QSGRendererInterface *rif = m_window->rendererInterface();
+        void *nativeObj = nullptr;
         switch (rif->graphicsApi()) {
         case QSGRendererInterface::Direct3D11Rhi: {
             // Direct3D: Qt RHI's default backend on Windows. Not supported on
             // all other platforms.
 #ifdef Q_OS_WINDOWS
-            auto dev = (ID3D11Device *) rif->getResource(m_window,
-                                                         QSGRendererInterface::DeviceResource);
+            auto dev = static_cast<ID3D11Device *>(
+                rif->getResource(m_window, QSGRendererInterface::DeviceResource));
             D3D11_TEXTURE2D_DESC desc = CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_R8G8B8A8_UNORM,
                                                               m_size.width(),
                                                               m_size.height(),
@@ -209,19 +211,14 @@ public:
                     qCCritical(lcMdkD3D11Renderer).noquote() << "Failed to create 2D texture!";
                 }
             }
-            QSGTexture *wrapper
-                = m_window->createTextureFromNativeObject(QQuickWindow::NativeObjectTexture,
-                                                          m_texture_d3d11.GetAddressOf(),
-                                                          0,
-                                                          m_size);
-            setTexture(wrapper);
+            nativeObj = m_texture_d3d11.Get();
             MDK_NS::D3D11RenderAPI ra{};
-            Microsoft::WRL::ComPtr<ID3D11DeviceContext> ctx;
-            dev->GetImmediateContext(&ctx);
-            ra.context = ctx.Get();
-            dev->CreateRenderTargetView(m_texture_d3d11.Get(), nullptr, &m_rtv);
-            ra.rtv = m_rtv.Get();
+            ra.rtv = static_cast<ID3D11Texture2D *>(nativeObj);
             player->setRenderAPI(&ra);
+#else
+            qCCritical(lcMdkRenderer).noquote()
+                << "Failed to initialize the Direct3D11 renderer: The Direct3D11 renderer is only "
+                   "available on Windows platform.";
 #endif
         } break;
         case QSGRendererInterface::VulkanRhi: {
@@ -232,8 +229,8 @@ public:
             // Metal: Qt RHI's default backend on macOS. Not supported on all
             // other platforms.
 #ifdef Q_OS_MACOS
-            auto dev = (__bridge id<MTLDevice>)
-                           rif->getResource(m_window, QSGRendererInterface::DeviceResource);
+            auto dev = static_cast<__bridge id<MTLDevice>>(
+                rif->getResource(m_window, QSGRendererInterface::DeviceResource));
             Q_ASSERT(dev);
             MTLTextureDescriptor *desc = [[MTLTextureDescriptor alloc] init];
             desc.textureType = MTLTextureType2D;
@@ -245,17 +242,16 @@ public:
             desc.storageMode = MTLStorageModePrivate;
             desc.usage = MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget;
             m_texture_mtl = [dev newTextureWithDescriptor:desc];
-            QSGTexture *wrapper
-                = m_window->createTextureFromNativeObject(QQuickWindow::NativeObjectTexture,
-                                                          &m_texture_mtl,
-                                                          0,
-                                                          m_size);
-            setTexture(wrapper);
+            nativeObj = static_cast<__bridge void *>(m_texture_mtl);
             MDK_NS::MetalRenderAPI ra{};
-            ra.texture = (__bridge void *) m_texture_mtl;
-            ra.device = (__bridge void *) dev;
+            ra.texture = nativeObj;
+            ra.device = static_cast<__bridge void *>(dev);
             ra.cmdQueue = rif->getResource(m_window, QSGRendererInterface::CommandQueueResource);
             player->setRenderAPI(&ra);
+#else
+            qCCritical(lcMdkRenderer).noquote()
+                << "Failed to initialize the Metal renderer: The Metal renderer is only available "
+                   "on macOS platform.";
 #endif
         } break;
         case QSGRendererInterface::OpenGL:
@@ -265,14 +261,16 @@ public:
 #if QT_CONFIG(opengl)
             fbo_gl.reset(new QOpenGLFramebufferObject(m_size));
             auto tex = fbo_gl->texture();
-            QSGTexture *wrapper
-                = m_window->createTextureFromNativeObject(QQuickWindow::NativeObjectTexture,
-                                                          &tex,
-                                                          0,
-                                                          m_size);
-            setTexture(wrapper);
+            nativeObj = reinterpret_cast<void *>(tex);
+            MDK_NS::GLRenderAPI ra{};
+            ra.fbo = fbo_gl->handle();
+            player->setRenderAPI(&ra);
             // Flip y.
             player->scale(1.0f, -1.0f);
+#else
+            qCCritical(lcMdkRenderer).noquote()
+                << "Failed to initialize the OpenGL renderer: This version of Qt is not configured "
+                   "with OpenGL support.";
 #endif
         } break;
         default:
@@ -281,6 +279,17 @@ public:
                     << "QSGRendererInterface reports unknown graphics API:" << rif->graphicsApi();
             }
             break;
+        }
+        if (nativeObj) {
+            QSGTexture *wrapper
+                = m_window->createTextureFromNativeObject(QQuickWindow::NativeObjectTexture,
+                                                          &nativeObj,
+                                                          0,
+                                                          m_size);
+            setTexture(wrapper);
+        } else {
+            qCCritical(lcMdkRenderer).noquote()
+                << "Can't set texture due to null nativeObj. Nothing will be rendered.";
         }
         player->setVideoSurfaceSize(m_size.width(), m_size.height());
     }
@@ -292,25 +301,11 @@ private Q_SLOTS:
     // beforeRenderPassRecording() instead.
     void render()
     {
-#if QT_CONFIG(opengl)
-        GLuint prevFbo = 0;
-        if (fbo_gl) {
-            auto f = QOpenGLContext::currentContext()->functions();
-            f->glGetIntegerv(GL_FRAMEBUFFER_BINDING, reinterpret_cast<GLint *>(&prevFbo));
-            fbo_gl->bind();
-        }
-#endif
         const auto player = m_player.lock();
         if (!player) {
             return;
         }
         player->renderVideo();
-#if QT_CONFIG(opengl)
-        if (fbo_gl) {
-            auto f = QOpenGLContext::currentContext()->functions();
-            f->glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
-        }
-#endif
     }
 
 private:
@@ -325,7 +320,6 @@ private:
     QWeakPointer<MDK_NS::Player> m_player;
 #ifdef Q_OS_WINDOWS
     Microsoft::WRL::ComPtr<ID3D11Texture2D> m_texture_d3d11;
-    Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_rtv;
 #endif
 #ifdef Q_OS_MACOS
     id<MTLTexture> m_texture_mtl = nil;
@@ -339,6 +333,9 @@ MdkObject::MdkObject(QQuickItem *parent) : QQuickItem(parent)
     qRegisterMetaType<VideoStreamInfo>();
     qRegisterMetaType<AudioStreamInfo>();
     qRegisterMetaType<MediaInfo>();
+    mdkloader_setMdkLibName("mdk");
+    mdkloader_initMdk();
+    Q_ASSERT(mdkloader_isMdkLoaded());
     m_player.reset(new MDK_NS::Player);
     Q_ASSERT(!m_player.isNull());
     if (!m_livePreview) {
@@ -1247,7 +1244,10 @@ void MdkObject::initMdkHandlers()
         }
         advance(now);
         if (!m_livePreview) {
-            qCDebug(lcMdkPlayback).noquote() << "Current media -->" << now;
+            qCDebug(lcMdkPlayback).noquote()
+                << "Current media -->"
+                << (now.isLocalFile() ? QDir::toNativeSeparators(now.toLocalFile())
+                                      : now.toDisplayString());
         }
         Q_EMIT urlChanged();
     });

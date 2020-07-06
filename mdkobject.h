@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "mdk/global.h"
+#include <mdk/global.h>
 #include <QHash>
 #include <QLoggingCategory>
 #include <QQuickItem>
@@ -131,7 +131,7 @@ public:
     struct ChapterInfo
     {
         qint64 beginTime = 0, endTime = 0;
-        QString title = QString();
+        QString title = {};
     };
     using Chapters = QList<ChapterInfo>;
 
@@ -148,10 +148,10 @@ public:
         int index = 0;
         qint64 startTime = 0;
         qint64 duration = 0;
-        QString codec = QString();
+        QString codec = {};
         qint64 bitRate = 0;
         qreal frameRate = 0.0;
-        QString format = QString();
+        QString format = {};
         int width = 0;
         int height = 0;
         MetaData metaData = {};
@@ -162,7 +162,7 @@ public:
         int index = 0;
         qint64 startTime = 0;
         qint64 duration = 0;
-        QString codec = QString();
+        QString codec = {};
         qint64 bitRate = 0;
         qreal frameRate = 0.0;
         int channels = 0;
@@ -176,7 +176,7 @@ public:
         qint64 duration = 0;
         qint64 bitRate = 0;
         qint64 fileSize = 0;
-        QString format = QString();
+        QString format = {};
         int streamCount = 0;
         Chapters chapters = {};
         MetaData metaData = {};
@@ -434,7 +434,7 @@ public Q_SLOTS:
     bool currentIsVideo() const;
     bool currentIsAudio() const;
     bool currentIsMedia() const;
-    void startRecording(const QUrl &value, const QString &format = QString());
+    void startRecording(const QUrl &value, const QString &format = {});
     void stopRecording();
     void seekBackward(const int value = 5000);
     void seekForward(const int value = 5000);
@@ -502,8 +502,8 @@ private:
     bool m_mute = false, m_hasVideo = false, m_hasAudio = false, m_hasSubtitle = false,
          m_hasChapters = false, m_hardwareDecoding = false, m_autoStart = true,
          m_livePreview = false, m_loop = false;
-    QString m_snapshotDirectory = QString(), m_snapshotFormat = QString::fromUtf8("jpg"),
-            m_snapshotTemplate = QString();
+    QString m_snapshotDirectory = {}, m_snapshotFormat = QString::fromUtf8("jpg"),
+            m_snapshotTemplate = {};
     QStringList m_videoDecoders = {}, m_audioDecoders = {}, m_audioBackends = {};
     FillMode m_fillMode = FillMode::PreserveAspectFit;
     MediaInfo m_mediaInfo = {};
