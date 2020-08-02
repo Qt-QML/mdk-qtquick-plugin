@@ -342,9 +342,8 @@ MdkObject::MdkObject(QQuickItem *parent) : QQuickItem(parent)
     qRegisterMetaType<VideoStreamInfo>();
     qRegisterMetaType<AudioStreamInfo>();
     qRegisterMetaType<MediaInfo>();
-    mdkloader_setMdkLibName("mdk");
-    mdkloader_initMdk();
-    Q_ASSERT(mdkloader_isMdkLoaded());
+    mdkloader_load("mdk");
+    Q_ASSERT(mdkloader_isLoaded());
     m_player.reset(new MDK_NS::Player);
     Q_ASSERT(!m_player.isNull());
     if (!m_livePreview) {
@@ -364,7 +363,7 @@ MdkObject::MdkObject(QQuickItem *parent) : QQuickItem(parent)
 MdkObject::~MdkObject()
 {
     MDK_NS::setLogHandler(nullptr);
-    mdkloader_close();
+    mdkloader_cleanup();
     if (!m_livePreview) {
         qCDebug(lcMdk).noquote() << "Player destroyed.";
     }
