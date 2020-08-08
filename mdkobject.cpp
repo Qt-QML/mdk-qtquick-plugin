@@ -109,9 +109,10 @@ QStringList suffixesToMimeTypes(const QStringList &suffixes)
     return mimeTypes;
 }
 
-QString timeToString(const qint64 ms)
+QString timeToString(const qint64 ms, const bool isAudio = false)
 {
-    return QTime(0, 0).addMSecs(ms).toString(QString::fromUtf8("hh:mm:ss"));
+    return QTime(0, 0).addMSecs(ms).toString(isAudio ? QString::fromUtf8("mm:ss")
+                                                     : QString::fromUtf8("hh:mm:ss"));
 }
 
 std::vector<std::string> qStringListToStdStringVector(const QStringList &stringList)
@@ -800,12 +801,12 @@ QStringList MdkObject::audioMimeTypes()
 
 QString MdkObject::positionText() const
 {
-    return isStopped() ? QString() : timeToString(position());
+    return isStopped() ? QString() : timeToString(position(), currentIsAudio());
 }
 
 QString MdkObject::durationText() const
 {
-    return isStopped() ? QString() : timeToString(duration());
+    return isStopped() ? QString() : timeToString(duration(), currentIsAudio());
 }
 
 bool MdkObject::hardwareDecoding() const
