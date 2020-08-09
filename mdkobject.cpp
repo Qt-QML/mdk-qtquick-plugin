@@ -364,7 +364,7 @@ MdkObject::MdkObject(QQuickItem *parent) : QQuickItem(parent)
 MdkObject::~MdkObject()
 {
     MDK_NS::setLogHandler(nullptr);
-    mdkloader_cleanup();
+    // mdkloader_cleanup();
     if (!m_livePreview) {
         qCDebug(lcMdk).noquote() << "Player destroyed.";
     }
