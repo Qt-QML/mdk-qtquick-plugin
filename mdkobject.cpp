@@ -457,17 +457,27 @@ void MdkObject::setUrl(const QUrl &value)
 
 void MdkObject::setUrls(const QList<QUrl> &value)
 {
-    if (m_urls != value) {
-        m_player->setNextMedia(nullptr);
+    m_player->setNextMedia(nullptr);
+    if (value.isEmpty()) {
+        m_urls.clear();
+        Q_EMIT urlsChanged();
+        m_next_it = nullptr;
+        stop();
+        return;
+    }
+    const QUrl now = url();
+    const QUrl first = value.constFirst();
+    if (m_urls == value) {
+        if (!isPlaying()) {
+            if (now.isValid()) {
+                play();
+            } else {
+                play(first);
+            }
+        }
+    } else {
         m_urls = value;
         Q_EMIT urlsChanged();
-        if (m_urls.isEmpty()) {
-            m_next_it = nullptr;
-            stop();
-            return;
-        }
-        const QUrl now = url();
-        const QUrl first = m_urls.constFirst();
         if (!now.isValid()) {
             play(first);
             return;
@@ -1384,7 +1394,21 @@ void MdkObject::initMdkHandlers()
 
 void MdkObject::resetInternalData()
 {
-    //m_urls.clear();
+    // Make sure MdkObject::url() returns empty.
+    m_player->setMedia(nullptr);
+#if 0
+    advance();
+    if (m_next_it == nullptr) {
+        m_urls.clear();
+        Q_EMIT urlsChanged();
+    } else {
+        if (m_next_it == m_urls.cbegin()) {
+            m_next_it = m_urls.cend();
+        }
+        --m_next_it;
+    }
+#endif
+    // ----------------
     m_hasVideo = false;
     m_hasAudio = false;
     m_hasSubtitle = false;
@@ -1393,7 +1417,6 @@ void MdkObject::resetInternalData()
     m_mediaInfo = {};
     m_mediaStatus = MDK_NS::MediaStatus::NoMedia;
     Q_EMIT urlChanged();
-    //Q_EMIT urlsChanged();
     Q_EMIT positionChanged();
     Q_EMIT durationChanged();
     Q_EMIT seekableChanged();

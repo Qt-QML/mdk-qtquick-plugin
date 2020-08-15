@@ -235,7 +235,7 @@ public:
     QString snapshotTemplate() const;
     void setSnapshotTemplate(const QString &value);
 
-    static QStringList videoSuffixes()
+    static inline QStringList videoSuffixes()
     {
         return QStringList{QString::fromUtf8("*.3g2"),   QString::fromUtf8("*.3ga"),
                            QString::fromUtf8("*.3gp"),   QString::fromUtf8("*.3gp2"),
@@ -288,7 +288,7 @@ public:
                            QString::fromUtf8("*.xspf")};
     }
 
-    static QStringList audioSuffixes()
+    static inline QStringList audioSuffixes()
     {
         return QStringList{QString::fromUtf8("*.mp3"),
                            QString::fromUtf8("*.aac"),
@@ -303,7 +303,7 @@ public:
                            QString::fromUtf8("*.wv")};
     }
 
-    static QStringList subtitleSuffixes()
+    static inline QStringList subtitleSuffixes()
     {
         return QStringList{QString::fromUtf8("*.utf"),
                            QString::fromUtf8("*.utf8"),
@@ -321,7 +321,7 @@ public:
                            QString::fromUtf8("*.smi")};
     }
 
-    static QStringList mediaSuffixes()
+    static inline QStringList mediaSuffixes()
     {
         QStringList suffixes{};
         suffixes.append(videoSuffixes());
@@ -333,7 +333,7 @@ public:
 
     static QStringList audioMimeTypes();
 
-    static QStringList mediaMimeTypes()
+    static inline QStringList mediaMimeTypes()
     {
         QStringList mimeTypes{};
         mimeTypes.append(videoMimeTypes());
@@ -355,7 +355,7 @@ public:
     void setAudioDecoders(const QStringList &value);
 
     // The order is important. Only FFmpeg is software decoding.
-    QStringList defaultVideoDecoders() const
+    inline QStringList defaultVideoDecoders() const
     {
 #ifdef Q_OS_WINDOWS
         return QStringList{QString::fromUtf8("MFT:d3d=11"),
@@ -383,7 +383,7 @@ public:
 #endif
     }
 
-    QStringList defaultAudioDecoders() const { return {}; }
+    inline QStringList defaultAudioDecoders() const { return {}; }
 
     QStringList audioBackends() const;
     // Available audio backends: XAudio2 (Windows only), ALSA (Linux only),
