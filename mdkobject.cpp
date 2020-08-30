@@ -33,9 +33,6 @@
 #include <Metal/Metal.h>
 #endif
 
-#include <mdk/Player.h>
-#include <mdk/RenderAPI.h>
-#include <mdkloader.h>
 #include <QDebug>
 #include <QDir>
 #include <QFileInfo>
@@ -48,9 +45,29 @@
 #include <QStandardPaths>
 #include <QTime>
 #include <QtMath>
+#if QT_CONFIG(vulkan)
+#include <QVulkanFunctions>
+#include <QVulkanInstance>
+#endif
 #if QT_CONFIG(opengl)
 #include <QOpenGLFramebufferObject>
-#include <QOpenGLFunctions>
+#endif
+#include <mdk/Player.h>
+#include <mdk/RenderAPI.h>
+#include <mdkloader.h>
+
+#if QT_CONFIG(vulkan)
+#define VK_RUN_CHECK(x, ...) \
+    do { \
+        VkResult __vkret__ = x; \
+        if (__vkret__ != VK_SUCCESS) { \
+            qCDebug(lcMdkVulkanRenderer).noquote() \
+                << #x " ERROR: " << __vkret__ << " @" << __LINE__ << __func__; \
+            __VA_ARGS__; \
+        } \
+    } while (false)
+#define VK_ENSURE(x, ...) VK_RUN_CHECK(x, return __VA_ARGS__)
+#define VK_WARN(x, ...) VK_RUN_CHECK(x)
 #endif
 
 Q_LOGGING_CATEGORY(lcMdk, "mdk.general")
@@ -165,9 +182,18 @@ public:
     {
         delete texture();
         // Release gfx resources.
+#if QT_CONFIG(vulkan)
+        freeTexture();
+#endif
 #if QT_CONFIG(opengl)
         fbo_gl.reset();
 #endif
+        // when device lost occurs
+        const auto player = m_player.lock();
+        if (!player) {
+            return;
+        }
+        player->setVideoSurfaceSize(-1, -1);
         if (!m_livePreview) {
             qCDebug(lcMdkRenderer).noquote() << "Renderer destroyed.";
         }
@@ -196,7 +222,8 @@ public:
             return;
         }
         QSGRendererInterface *rif = m_window->rendererInterface();
-        void *nativeObj = nullptr;
+        intmax_t nativeObj = 0;
+        int nativeLayout = 0;
         switch (rif->graphicsApi()) {
         case QSGRendererInterface::Direct3D11Rhi: {
             // Direct3D: Qt RHI's default backend on Windows. Not supported on
@@ -221,9 +248,9 @@ public:
                     qCCritical(lcMdkD3D11Renderer).noquote() << "Failed to create 2D texture!";
                 }
             }
-            nativeObj = m_texture_d3d11.Get();
+            nativeObj = reinterpret_cast<decltype(nativeObj)>(m_texture_d3d11.Get());
             MDK_NS::D3D11RenderAPI ra{};
-            ra.rtv = static_cast<ID3D11Texture2D *>(nativeObj);
+            ra.rtv = m_texture_d3d11.Get();
             player->setRenderAPI(&ra);
 #else
             qCCritical(lcMdkRenderer).noquote()
@@ -234,6 +261,82 @@ public:
         case QSGRendererInterface::VulkanRhi: {
             // Vulkan: Qt RHI's default backend on Linux (Android). Supported on
             // Windows and macOS as well.
+#if QT_CONFIG(vulkan)
+            nativeLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            auto inst = reinterpret_cast<QVulkanInstance *>(
+                rif->getResource(m_window, QSGRendererInterface::VulkanInstanceResource));
+            m_physDev = *static_cast<VkPhysicalDevice *>(
+                rif->getResource(m_window, QSGRendererInterface::PhysicalDeviceResource));
+            auto newDev = *static_cast<VkDevice *>(
+                rif->getResource(m_window, QSGRendererInterface::DeviceResource));
+            qCDebug(lcMdkVulkanRenderer).noquote()
+                << "old device:" << (void *) m_dev << "newDev:" << (void *) newDev;
+            // TODO: why m_dev is 0 if device lost
+            freeTexture();
+            m_dev = newDev;
+            m_devFuncs = inst->deviceFunctions(m_dev);
+            buildTexture(m_size);
+            nativeObj = reinterpret_cast<decltype(nativeObj)>(m_texture_vk);
+            MDK_NS::VulkanRenderAPI ra{};
+            ra.device = m_dev;
+            ra.phy_device = m_physDev;
+            ra.opaque = this;
+            ra.renderTargetInfo = [](void *opaque, int *w, int *h, VkFormat *fmt) {
+                auto node = static_cast<VideoTextureNode *>(opaque);
+                *w = node->m_size.width();
+                *h = node->m_size.height();
+                *fmt = VK_FORMAT_R8G8B8A8_UNORM;
+                return 1;
+            };
+            ra.beginFrame = [](void *opaque,
+                               VkImageView *view /* = nullptr*/,
+                               VkFramebuffer *fb /*= nullptr*/,
+                               VkSemaphore *imgSem /* = nullptr*/) {
+                Q_UNUSED(fb)
+                Q_UNUSED(imgSem)
+                auto node = static_cast<VideoTextureNode *>(opaque);
+                *view = node->m_textureView;
+                return 0;
+            };
+            ra.currentCommandBuffer = [](void *opaque) {
+                auto node = static_cast<VideoTextureNode *>(opaque);
+                QSGRendererInterface *rif = node->m_window->rendererInterface();
+                auto cmdBuf = *static_cast<VkCommandBuffer *>(
+                    rif->getResource(node->m_window, QSGRendererInterface::CommandListResource));
+                return cmdBuf;
+            };
+            ra.endFrame = [](void *opaque, VkSemaphore *) {
+                auto node = static_cast<VideoTextureNode *>(opaque);
+                QSGRendererInterface *rif = node->m_window->rendererInterface();
+                auto cmdBuf = *static_cast<VkCommandBuffer *>(
+                    rif->getResource(node->m_window, QSGRendererInterface::CommandListResource));
+                VkImageMemoryBarrier imageTransitionBarrier = {};
+                imageTransitionBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                imageTransitionBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                imageTransitionBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+                imageTransitionBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                imageTransitionBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                imageTransitionBarrier.image = node->m_texture_vk;
+                imageTransitionBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                imageTransitionBarrier.subresourceRange.levelCount
+                    = imageTransitionBarrier.subresourceRange.layerCount = 1;
+                node->m_devFuncs->vkCmdPipelineBarrier(cmdBuf,
+                                                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                                       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                                                       0,
+                                                       0,
+                                                       nullptr,
+                                                       0,
+                                                       nullptr,
+                                                       1,
+                                                       &imageTransitionBarrier);
+            };
+            player->setRenderAPI(&ra);
+#else
+            qCCritical(lcMdkRenderer).noquote()
+                << "Failed to initialize the Vulkan renderer: This version of Qt is not configured "
+                   "with Vulkan support.";
+#endif
         } break;
         case QSGRendererInterface::MetalRhi: {
             // Metal: Qt RHI's default backend on macOS. Not supported on all
@@ -252,12 +355,12 @@ public:
             desc.storageMode = MTLStorageModePrivate;
             desc.usage = MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget;
             m_texture_mtl = [dev newTextureWithDescriptor:desc];
-            nativeObj = static_cast<__bridge void *>(m_texture_mtl);
             MDK_NS::MetalRenderAPI ra{};
-            ra.texture = nativeObj;
+            ra.texture = (__bridge void *) m_texture_mtl;
             ra.device = static_cast<__bridge void *>(dev);
             ra.cmdQueue = rif->getResource(m_window, QSGRendererInterface::CommandQueueResource);
             player->setRenderAPI(&ra);
+            nativeObj = decltype(nativeObj)(ra.texture);
 #else
             qCCritical(lcMdkRenderer).noquote()
                 << "Failed to initialize the Metal renderer: The Metal renderer is only available "
@@ -270,8 +373,8 @@ public:
             // Supported on all mainstream platforms.
 #if QT_CONFIG(opengl)
             fbo_gl.reset(new QOpenGLFramebufferObject(m_size));
-            auto tex = fbo_gl->texture();
-            nativeObj = reinterpret_cast<void *>(tex);
+            const auto tex = fbo_gl->texture();
+            nativeObj = static_cast<decltype(nativeObj)>(tex);
             MDK_NS::GLRenderAPI ra{};
             ra.fbo = fbo_gl->handle();
             player->setRenderAPI(&ra);
@@ -294,7 +397,7 @@ public:
             QSGTexture *wrapper
                 = m_window->createTextureFromNativeObject(QQuickWindow::NativeObjectTexture,
                                                           &nativeObj,
-                                                          0,
+                                                          nativeLayout,
                                                           m_size);
             setTexture(wrapper);
         } else {
@@ -318,12 +421,97 @@ private Q_SLOTS:
         player->renderVideo();
     }
 
+#if QT_CONFIG(vulkan)
+    bool buildTexture(const QSize &size)
+    {
+        VkImageCreateInfo imageInfo;
+        memset(&imageInfo, 0, sizeof(imageInfo));
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.flags = 0;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM; // QtQuick hardcoded
+        imageInfo.extent.width = uint32_t(size.width());
+        imageInfo.extent.height = uint32_t(size.height());
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+
+        imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        imageInfo.usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+        VkImage image = VK_NULL_HANDLE;
+        VK_ENSURE(m_devFuncs->vkCreateImage(m_dev, &imageInfo, nullptr, &image), false);
+
+        m_texture_vk = image;
+
+        VkMemoryRequirements memReq;
+        m_devFuncs->vkGetImageMemoryRequirements(m_dev, image, &memReq);
+
+        quint32 memIndex = 0;
+        VkPhysicalDeviceMemoryProperties physDevMemProps;
+        m_window->vulkanInstance()
+            ->functions()
+            ->vkGetPhysicalDeviceMemoryProperties(m_physDev, &physDevMemProps);
+        for (uint32_t i = 0; i < physDevMemProps.memoryTypeCount; ++i) {
+            if (!(memReq.memoryTypeBits & (1 << i)))
+                continue;
+            memIndex = i;
+        }
+
+        VkMemoryAllocateInfo allocInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+                                          nullptr,
+                                          memReq.size,
+                                          memIndex};
+
+        VK_ENSURE(m_devFuncs->vkAllocateMemory(m_dev, &allocInfo, nullptr, &m_textureMemory), false);
+
+        VK_ENSURE(m_devFuncs->vkBindImageMemory(m_dev, image, m_textureMemory, 0), false);
+
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = image;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = imageInfo.format;
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewInfo.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+        viewInfo.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+
+        VK_ENSURE(m_devFuncs->vkCreateImageView(m_dev, &viewInfo, nullptr, &m_textureView), false);
+        return true;
+    }
+
+    void freeTexture()
+    {
+        if (!m_texture_vk) {
+            return;
+        }
+        VK_WARN(m_devFuncs->vkDeviceWaitIdle(m_dev));
+        m_devFuncs->vkFreeMemory(m_dev, m_textureMemory, nullptr);
+        m_textureMemory = VK_NULL_HANDLE;
+        m_devFuncs->vkDestroyImageView(m_dev, m_textureView, nullptr);
+        m_textureView = VK_NULL_HANDLE;
+        m_devFuncs->vkDestroyImage(m_dev, m_texture_vk, nullptr);
+        m_texture_vk = VK_NULL_HANDLE;
+    }
+#endif
+
 private:
     bool m_livePreview = false;
     QQuickItem *m_item = nullptr;
     QQuickWindow *m_window = nullptr;
     QSize m_size = {};
     qreal m_dpr = 1.0;
+#if QT_CONFIG(vulkan)
+    VkImage m_texture_vk = VK_NULL_HANDLE;
+    VkDeviceMemory m_textureMemory = VK_NULL_HANDLE;
+    VkImageView m_textureView = VK_NULL_HANDLE;
+    VkPhysicalDevice m_physDev = VK_NULL_HANDLE;
+    VkDevice m_dev = VK_NULL_HANDLE;
+    QVulkanDeviceFunctions *m_devFuncs = nullptr;
+#endif
 #if QT_CONFIG(opengl)
     QScopedPointer<QOpenGLFramebufferObject> fbo_gl;
 #endif
@@ -363,7 +551,7 @@ MdkObject::MdkObject(QQuickItem *parent) : QQuickItem(parent)
 
 MdkObject::~MdkObject()
 {
-    MDK_NS::setLogHandler(nullptr);
+    // MDK_NS::setLogHandler(nullptr);
     // mdkloader_cleanup();
     if (!m_livePreview) {
         qCDebug(lcMdk).noquote() << "Player destroyed.";
@@ -436,14 +624,19 @@ void MdkObject::setUrl(const QUrl &value)
     if (now.isValid() && (value != now)) {
         Q_EMIT newHistory(now, position());
     }
+    const auto realStop = [this]() -> void {
+        m_player->setNextMedia(nullptr);
+        m_player->setState(MDK_NS::PlaybackState::Stopped);
+        m_player->waitFor(MDK_NS::PlaybackState::Stopped);
+    };
     if (value.isEmpty()) {
-        stop();
+        realStop();
         return;
     }
     if (!value.isValid() || (value == url()) || !isMedia(value)) {
         return;
     }
-    stop();
+    realStop();
     //advance(value);
     // The first url may be the same as current url.
     m_player->setMedia(nullptr);
