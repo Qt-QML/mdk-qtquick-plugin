@@ -24,15 +24,6 @@
 
 #include "mdkobject.h"
 
-#ifdef Q_OS_WINDOWS
-#include <d3d11.h>
-#include <wrl/client.h>
-#endif
-
-#ifdef Q_OS_MACOS
-#include <Metal/Metal.h>
-#endif
-
 #include <QDebug>
 #include <QDir>
 #include <QFileInfo>
@@ -45,13 +36,25 @@
 #include <QStandardPaths>
 #include <QTime>
 #include <QtMath>
+
 #if QT_CONFIG(vulkan)
 #include <QVulkanFunctions>
 #include <QVulkanInstance>
 #endif
+
 #if QT_CONFIG(opengl)
 #include <QOpenGLFramebufferObject>
 #endif
+
+#ifdef Q_OS_WINDOWS
+#include <d3d11.h>
+#include <wrl/client.h>
+#endif
+
+#ifdef Q_OS_MACOS
+#include <Metal/Metal.h>
+#endif
+
 #include <mdk/Player.h>
 #include <mdk/RenderAPI.h>
 #include <mdkloader.h>
@@ -281,55 +284,22 @@ public:
             ra.device = m_dev;
             ra.phy_device = m_physDev;
             ra.opaque = this;
-            ra.renderTargetInfo = [](void *opaque, int *w, int *h, VkFormat *fmt) {
-                auto node = static_cast<VideoTextureNode *>(opaque);
-                *w = node->m_size.width();
-                *h = node->m_size.height();
-                *fmt = VK_FORMAT_R8G8B8A8_UNORM;
-                return 1;
-            };
-            ra.beginFrame = [](void *opaque,
-                               VkImageView *view /* = nullptr*/,
-                               VkFramebuffer *fb /*= nullptr*/,
-                               VkSemaphore *imgSem /* = nullptr*/) {
-                Q_UNUSED(fb)
-                Q_UNUSED(imgSem)
-                auto node = static_cast<VideoTextureNode *>(opaque);
-                *view = node->m_textureView;
-                return 0;
-            };
+            ra.rt = m_texture_vk;
+            ra.renderTargetInfo =
+                [](void *opaque, int *w, int *h, VkFormat *fmt, VkImageLayout *layout) {
+                    auto node = static_cast<VideoTextureNode *>(opaque);
+                    *w = node->m_size.width();
+                    *h = node->m_size.height();
+                    *fmt = VK_FORMAT_R8G8B8A8_UNORM;
+                    *layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    return 1;
+                };
             ra.currentCommandBuffer = [](void *opaque) {
                 auto node = static_cast<VideoTextureNode *>(opaque);
                 QSGRendererInterface *rif = node->m_window->rendererInterface();
                 auto cmdBuf = *static_cast<VkCommandBuffer *>(
                     rif->getResource(node->m_window, QSGRendererInterface::CommandListResource));
                 return cmdBuf;
-            };
-            ra.endFrame = [](void *opaque, VkSemaphore *) {
-                auto node = static_cast<VideoTextureNode *>(opaque);
-                QSGRendererInterface *rif = node->m_window->rendererInterface();
-                auto cmdBuf = *static_cast<VkCommandBuffer *>(
-                    rif->getResource(node->m_window, QSGRendererInterface::CommandListResource));
-                VkImageMemoryBarrier imageTransitionBarrier = {};
-                imageTransitionBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-                imageTransitionBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-                imageTransitionBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-                imageTransitionBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                imageTransitionBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                imageTransitionBarrier.image = node->m_texture_vk;
-                imageTransitionBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                imageTransitionBarrier.subresourceRange.levelCount
-                    = imageTransitionBarrier.subresourceRange.layerCount = 1;
-                node->m_devFuncs->vkCmdPipelineBarrier(cmdBuf,
-                                                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                                                       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                                                       0,
-                                                       0,
-                                                       nullptr,
-                                                       0,
-                                                       nullptr,
-                                                       1,
-                                                       &imageTransitionBarrier);
             };
             player->setRenderAPI(&ra);
 #else
@@ -438,48 +408,30 @@ private Q_SLOTS:
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
-
         imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
         imageInfo.usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
         VkImage image = VK_NULL_HANDLE;
         VK_ENSURE(m_devFuncs->vkCreateImage(m_dev, &imageInfo, nullptr, &image), false);
-
         m_texture_vk = image;
-
         VkMemoryRequirements memReq;
         m_devFuncs->vkGetImageMemoryRequirements(m_dev, image, &memReq);
-
         quint32 memIndex = 0;
         VkPhysicalDeviceMemoryProperties physDevMemProps;
         m_window->vulkanInstance()
             ->functions()
             ->vkGetPhysicalDeviceMemoryProperties(m_physDev, &physDevMemProps);
         for (uint32_t i = 0; i < physDevMemProps.memoryTypeCount; ++i) {
-            if (!(memReq.memoryTypeBits & (1 << i)))
+            if (!(memReq.memoryTypeBits & (1 << i))) {
                 continue;
+            }
             memIndex = i;
         }
-
         VkMemoryAllocateInfo allocInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
                                           nullptr,
                                           memReq.size,
                                           memIndex};
-
         VK_ENSURE(m_devFuncs->vkAllocateMemory(m_dev, &allocInfo, nullptr, &m_textureMemory), false);
-
         VK_ENSURE(m_devFuncs->vkBindImageMemory(m_dev, image, m_textureMemory, 0), false);
-
-        VkImageViewCreateInfo viewInfo{};
-        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        viewInfo.image = image;
-        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.format = imageInfo.format;
-        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        viewInfo.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-        viewInfo.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
-
-        VK_ENSURE(m_devFuncs->vkCreateImageView(m_dev, &viewInfo, nullptr, &m_textureView), false);
         return true;
     }
 
@@ -491,8 +443,6 @@ private Q_SLOTS:
         VK_WARN(m_devFuncs->vkDeviceWaitIdle(m_dev));
         m_devFuncs->vkFreeMemory(m_dev, m_textureMemory, nullptr);
         m_textureMemory = VK_NULL_HANDLE;
-        m_devFuncs->vkDestroyImageView(m_dev, m_textureView, nullptr);
-        m_textureView = VK_NULL_HANDLE;
         m_devFuncs->vkDestroyImage(m_dev, m_texture_vk, nullptr);
         m_texture_vk = VK_NULL_HANDLE;
     }
@@ -507,7 +457,6 @@ private:
 #if QT_CONFIG(vulkan)
     VkImage m_texture_vk = VK_NULL_HANDLE;
     VkDeviceMemory m_textureMemory = VK_NULL_HANDLE;
-    VkImageView m_textureView = VK_NULL_HANDLE;
     VkPhysicalDevice m_physDev = VK_NULL_HANDLE;
     VkDevice m_dev = VK_NULL_HANDLE;
     QVulkanDeviceFunctions *m_devFuncs = nullptr;
