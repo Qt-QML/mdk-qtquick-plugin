@@ -57,7 +57,6 @@
 
 #include <mdk/Player.h>
 #include <mdk/RenderAPI.h>
-#include <mdkloader.h>
 
 #if QT_CONFIG(vulkan)
 #define VK_RUN_CHECK(x, ...) \
@@ -272,8 +271,8 @@ public:
                 rif->getResource(m_window, QSGRendererInterface::PhysicalDeviceResource));
             auto newDev = *static_cast<VkDevice *>(
                 rif->getResource(m_window, QSGRendererInterface::DeviceResource));
-            qCDebug(lcMdkVulkanRenderer).noquote()
-                << "old device:" << (void *) m_dev << "newDev:" << (void *) newDev;
+            /*qCDebug(lcMdkVulkanRenderer).noquote()
+                << "old device:" << (void *) m_dev << "newDev:" << (void *) newDev;*/
             // TODO: why m_dev is 0 if device lost
             freeTexture();
             m_dev = newDev;
@@ -480,8 +479,6 @@ MdkObject::MdkObject(QQuickItem *parent) : QQuickItem(parent)
     qRegisterMetaType<VideoStreamInfo>();
     qRegisterMetaType<AudioStreamInfo>();
     qRegisterMetaType<MediaInfo>();
-    mdkloader_load("mdk");
-    Q_ASSERT(mdkloader_isLoaded());
     m_player.reset(new MDK_NS::Player);
     Q_ASSERT(!m_player.isNull());
     if (!m_livePreview) {
@@ -500,7 +497,6 @@ MdkObject::MdkObject(QQuickItem *parent) : QQuickItem(parent)
 
 MdkObject::~MdkObject()
 {
-    // mdkloader_cleanup(); // crash
     if (!m_livePreview) {
         qCDebug(lcMdk).noquote() << "Player destroyed.";
     }
