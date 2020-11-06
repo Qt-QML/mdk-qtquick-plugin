@@ -224,10 +224,8 @@ public:
             return;
         }
         QSGRendererInterface *rif = m_window->rendererInterface();
-        intmax_t nativeObj = 0;
-        int nativeLayout = 0;
         switch (rif->graphicsApi()) {
-        case QSGRendererInterface::Direct3D11Rhi: {
+        case QSGRendererInterface::Direct3D11: {
             // Direct3D: Qt RHI's default backend on Windows. Not supported on
             // all other platforms.
 #ifdef Q_OS_WINDOWS
@@ -250,21 +248,29 @@ public:
                     qCCritical(lcMdkD3D11Renderer).noquote() << "Failed to create 2D texture!";
                 }
             }
-            nativeObj = reinterpret_cast<decltype(nativeObj)>(m_texture_d3d11.Get());
             MDK_NS::D3D11RenderAPI ra{};
             ra.rtv = m_texture_d3d11.Get();
             player->setRenderAPI(&ra);
+            const auto nativeObj = m_texture_d3d11.Get();
+            if (nativeObj) {
+                QSGTexture *wrapper = QNativeInterface::QSGD3D11Texture::fromNative(nativeObj,
+                                                                                    m_window,
+                                                                                    m_size);
+                setTexture(wrapper);
+            } else {
+                qCCritical(lcMdkD3D11Renderer).noquote()
+                    << "Can't set texture due to null nativeObj. Nothing will be rendered.";
+            }
 #else
             qCCritical(lcMdkRenderer).noquote()
                 << "Failed to initialize the Direct3D11 renderer: The Direct3D11 renderer is only "
                    "available on Windows platform.";
 #endif
         } break;
-        case QSGRendererInterface::VulkanRhi: {
+        case QSGRendererInterface::Vulkan: {
             // Vulkan: Qt RHI's default backend on Linux (Android). Supported on
             // Windows and macOS as well.
 #if QT_CONFIG(vulkan)
-            nativeLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             auto inst = reinterpret_cast<QVulkanInstance *>(
                 rif->getResource(m_window, QSGRendererInterface::VulkanInstanceResource));
             m_physDev = *static_cast<VkPhysicalDevice *>(
@@ -278,7 +284,6 @@ public:
             m_dev = newDev;
             m_devFuncs = inst->deviceFunctions(m_dev);
             buildTexture(m_size);
-            nativeObj = reinterpret_cast<decltype(nativeObj)>(m_texture_vk);
             MDK_NS::VulkanRenderAPI ra{};
             ra.device = m_dev;
             ra.phy_device = m_physDev;
@@ -301,13 +306,21 @@ public:
                 return cmdBuf;
             };
             player->setRenderAPI(&ra);
+            if (m_texture_vk) {
+                QSGTexture *wrapper = QNativeInterface::QSGVulkanTexture::fromNative(
+                    m_texture_vk, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_window, m_size);
+                setTexture(wrapper);
+            } else {
+                qCCritical(lcMdkVulkanRenderer).noquote()
+                    << "Can't set texture due to null nativeObj. Nothing will be rendered.";
+            }
 #else
             qCCritical(lcMdkRenderer).noquote()
                 << "Failed to initialize the Vulkan renderer: This version of Qt is not configured "
                    "with Vulkan support.";
 #endif
         } break;
-        case QSGRendererInterface::MetalRhi: {
+        case QSGRendererInterface::Metal: {
             // Metal: Qt RHI's default backend on macOS. Not supported on all
             // other platforms.
 #ifdef Q_OS_MACOS
@@ -336,19 +349,26 @@ public:
                    "on macOS platform.";
 #endif
         } break;
-        case QSGRendererInterface::OpenGL:
-        case QSGRendererInterface::OpenGLRhi: {
+        case QSGRendererInterface::OpenGL: {
             // OpenGL: The legacy backend, to keep compatibility of Qt 5.
             // Supported on all mainstream platforms.
 #if QT_CONFIG(opengl)
             fbo_gl.reset(new QOpenGLFramebufferObject(m_size));
             const auto tex = fbo_gl->texture();
-            nativeObj = static_cast<decltype(nativeObj)>(tex);
             MDK_NS::GLRenderAPI ra{};
             ra.fbo = fbo_gl->handle();
             player->setRenderAPI(&ra);
             // Flip y.
             player->scale(1.0f, -1.0f);
+            if (tex) {
+                QSGTexture *wrapper = QNativeInterface::QSGOpenGLTexture::fromNative(tex,
+                                                                                     m_window,
+                                                                                     m_size);
+                setTexture(wrapper);
+            } else {
+                qCCritical(lcMdkOpenGLRenderer).noquote()
+                    << "Can't set texture due to null nativeObj. Nothing will be rendered.";
+            }
 #else
             qCCritical(lcMdkRenderer).noquote()
                 << "Failed to initialize the OpenGL renderer: This version of Qt is not configured "
@@ -361,17 +381,6 @@ public:
                     << "QSGRendererInterface reports unknown graphics API:" << rif->graphicsApi();
             }
             break;
-        }
-        if (nativeObj) {
-            QSGTexture *wrapper
-                = m_window->createTextureFromNativeObject(QQuickWindow::NativeObjectTexture,
-                                                          &nativeObj,
-                                                          nativeLayout,
-                                                          m_size);
-            setTexture(wrapper);
-        } else {
-            qCCritical(lcMdkRenderer).noquote()
-                << "Can't set texture due to null nativeObj. Nothing will be rendered.";
         }
         player->setVideoSurfaceSize(m_size.width(), m_size.height());
     }
@@ -543,9 +552,9 @@ QSGNode *MdkObject::updatePaintNode(QSGNode *node, UpdatePaintNodeData *data)
     return n;
 }
 
-void MdkObject::geometryChanged(const QRectF &newGeometry, const QRectF &oldGeometry)
+void MdkObject::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)
 {
-    QQuickItem::geometryChanged(newGeometry, oldGeometry);
+    QQuickItem::geometryChange(newGeometry, oldGeometry);
     if (newGeometry.size() != oldGeometry.size()) {
         update();
     }

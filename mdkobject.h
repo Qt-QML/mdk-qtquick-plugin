@@ -444,7 +444,7 @@ public Q_SLOTS:
 protected:
     void timerEvent(QTimerEvent *event) override;
     QSGNode *updatePaintNode(QSGNode *node, UpdatePaintNodeData *data) override;
-    void geometryChanged(const QRectF &newGeometry, const QRectF &oldGeometry) override;
+    void geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry) override;
 
 private Q_SLOTS:
     void invalidateSceneGraph();
