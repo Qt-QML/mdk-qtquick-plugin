@@ -1119,11 +1119,14 @@ void MdkObject::setLivePreview(const bool value)
             // ensures the maximum delay of rendered video is one second and no
             // accumulated delay.
             m_player->setBufferRange(0, 1000, true);
+            // Prevent player stop playing after EOF is reached.
+            m_player->setProperty("continue_at_end", "1");
             // And don't forget to use accurate seek.
         } else {
             // Restore everything to default.
-            m_player->setBufferRange(4000, 16000, false);
+            m_player->setBufferRange(1000, 2000, false);
             m_player->setMute(m_mute);
+            m_player->setProperty("continue_at_end", "0");
             //MDK_NS::setLogLevel(MDK_NS::LogLevel::Debug);
         }
         Q_EMIT livePreviewChanged();
