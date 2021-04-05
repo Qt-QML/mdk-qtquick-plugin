@@ -105,9 +105,7 @@ QDebug operator<<(QDebug d, const MdkObject::Chapters &chapters)
 }
 #endif
 
-namespace {
-
-QStringList suffixesToMimeTypes(const QStringList &suffixes)
+static inline QStringList suffixesToMimeTypes(const QStringList &suffixes)
 {
     QStringList mimeTypes{};
     const QMimeDatabase db;
@@ -128,13 +126,13 @@ QStringList suffixesToMimeTypes(const QStringList &suffixes)
     return mimeTypes;
 }
 
-QString timeToString(const qint64 ms, const bool isAudio = false)
+static inline QString timeToString(const qint64 ms, const bool isAudio = false)
 {
     return QTime(0, 0).addMSecs(ms).toString(isAudio ? QString::fromUtf8("mm:ss")
                                                      : QString::fromUtf8("hh:mm:ss"));
 }
 
-std::vector<std::string> qStringListToStdStringVector(const QStringList &stringList)
+static inline std::vector<std::string> qStringListToStdStringVector(const QStringList &stringList)
 {
     if (stringList.isEmpty()) {
         return {};
@@ -146,7 +144,7 @@ std::vector<std::string> qStringListToStdStringVector(const QStringList &stringL
     return result;
 }
 
-QString urlToString(const QUrl &value, const bool display = false)
+static inline QString urlToString(const QUrl &value, const bool display = false)
 {
     if (!value.isValid()) {
         return {};
@@ -155,7 +153,10 @@ QString urlToString(const QUrl &value, const bool display = false)
                                 : (display ? value.toDisplayString() : value.url()));
 }
 
-} // namespace
+static inline MDK_NS::LogLevel _MDKObject_MDK_LogLevel()
+{
+    return static_cast<MDK_NS::LogLevel>(MDK_logLevel());
+}
 
 class VideoTextureNode : public QSGTextureProvider, public QSGSimpleTextureNode
 {
@@ -853,7 +854,7 @@ MdkObject::MediaStatus MdkObject::mediaStatus() const
 
 MdkObject::LogLevel MdkObject::logLevel() const
 {
-    switch (MDK_NS::logLevel()) {
+    switch (_MDKObject_MDK_LogLevel()) {
     case MDK_NS::LogLevel::Off:
         return LogLevel::Off;
     case MDK_NS::LogLevel::Debug:
@@ -874,24 +875,26 @@ void MdkObject::setLogLevel(const MdkObject::LogLevel value)
     if (value == logLevel()) {
         return;
     }
+    MDK_NS::LogLevel logLv = MDK_NS::LogLevel::Debug;
     switch (value) {
     case LogLevel::Off:
-        MDK_NS::setLogLevel(MDK_NS::LogLevel::Off);
+        logLv = MDK_NS::LogLevel::Off;
         break;
     case LogLevel::Debug:
-        MDK_NS::setLogLevel(MDK_NS::LogLevel::Debug);
+        logLv = MDK_NS::LogLevel::Debug;
         break;
     case LogLevel::Warning:
-        MDK_NS::setLogLevel(MDK_NS::LogLevel::Warning);
+        logLv = MDK_NS::LogLevel::Warning;
         break;
     case LogLevel::Critical:
     case LogLevel::Fatal:
-        MDK_NS::setLogLevel(MDK_NS::LogLevel::Error);
+        logLv = MDK_NS::LogLevel::Error;
         break;
     case LogLevel::Info:
-        MDK_NS::setLogLevel(MDK_NS::LogLevel::Info);
+        logLv = MDK_NS::LogLevel::Info;
         break;
     }
+    MDK_NS::SetGlobalOption("logLevel", logLv);
     Q_EMIT logLevelChanged();
     if (!m_livePreview) {
         qCDebug(lcMdkMisc).noquote() << "Log level -->" << value;
@@ -1038,7 +1041,7 @@ void MdkObject::setVideoDecoders(const QStringList &value)
 {
     if (m_videoDecoders != value) {
         m_videoDecoders = value.isEmpty() ? QStringList{QString::fromUtf8("FFmpeg")} : value;
-        m_player->setVideoDecoders(qStringListToStdStringVector(m_videoDecoders));
+        m_player->setDecoders(MDK_NS::MediaType::Video, qStringListToStdStringVector(m_videoDecoders));
         Q_EMIT videoDecodersChanged();
         if (!m_livePreview) {
             qCDebug(lcMdkPlayback).noquote() << "Video decoders -->" << m_videoDecoders;
@@ -1056,7 +1059,7 @@ void MdkObject::setAudioDecoders(const QStringList &value)
     if (m_audioDecoders != value) {
         // ### FIXME: value.isEmpty() ?
         m_audioDecoders = value;
-        m_player->setAudioDecoders(qStringListToStdStringVector(m_audioDecoders));
+        m_player->setDecoders(MDK_NS::MediaType::Audio, qStringListToStdStringVector(m_audioDecoders));
         Q_EMIT audioDecodersChanged();
         if (!m_livePreview) {
             qCDebug(lcMdkPlayback).noquote() << "Audio decoders -->" << m_audioDecoders;
@@ -1110,7 +1113,7 @@ void MdkObject::setLivePreview(const bool value)
         if (m_livePreview) {
             // Disable log output, otherwise they'll mix up with the real
             // player.
-            MDK_NS::setLogLevel(MDK_NS::LogLevel::Off);
+            MDK_NS::SetGlobalOption("logLevel", MDK_NS::LogLevel::Off);
             // We only need static images.
             m_player->setState(MDK_NS::PlaybackState::Paused);
             // We don't want the preview window play sound.
