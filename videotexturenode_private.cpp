@@ -156,7 +156,12 @@ QSGTexture *VideoTextureNodePrivate::ensureTexture(MDK_NS_PREPEND(Player) *playe
     {
 #ifdef Q_OS_WINDOWS
         MDK_NS_PREPEND(D3D11RenderAPI) ra = {};
-        ra.rtv = reinterpret_cast<ID3D11DeviceChild *>(reinterpret_cast<quintptr>(m_texture->nativeTexture().object));
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+        const auto _obj = static_cast<quintptr>(m_texture->nativeTexture().object);
+#else
+        const auto _obj = reinterpret_cast<quintptr>(m_texture->nativeTexture().object);
+#endif
+        ra.rtv = reinterpret_cast<ID3D11DeviceChild *>(_obj);
         player->setRenderAPI(&ra);
 #if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
         nativeObj = reinterpret_cast<decltype(nativeObj)>(ra.rtv);
