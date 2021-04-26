@@ -125,6 +125,34 @@ Window {
         onMoved: mdkPlayer.seek(slider.value)
     }
 
+    MDKPlayer {
+        id: preview
+        visible: mdkPlayer.playbackState !== MDKPlayer.PlaybackState.Stopped
+        url: mdkPlayer.url
+        livePreview: true
+        //hardwareDecoding: true
+        width: 200
+        height: 100
+    }
+
+    MouseArea {
+        enabled: mdkPlayer.playbackState !== MDKPlayer.PlaybackState.Stopped
+        anchors {
+            bottom: parent.bottom
+            left: parent.left
+            right: parent.right
+        }
+        height: 60
+        propagateComposedEvents: true
+        hoverEnabled: true
+        onPositionChanged: (mouse)=> {
+            preview.seek(mouseX / window.width * mdkPlayer.duration, false)
+            preview.x = mouseX - (preview.width / 2);
+            preview.y = window.height - preview.height - 50;
+            mouse.accepted = false;
+        }
+    }
+
     function gfxApi() {
         switch (GraphicsInfo.api) {
         case GraphicsInfo.Direct3D11:
