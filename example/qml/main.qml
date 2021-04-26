@@ -35,6 +35,36 @@ Window {
     height: 600
     title: (mdkPlayer.filePath.length > 0) ? (qsTr("Current playing: ") + mdkPlayer.filePath) : qsTr("MDKPlayer demo application")
 
+    function gfxApi() {
+        switch (GraphicsInfo.api) {
+        case GraphicsInfo.Direct3D11:
+            return "Direct3D11";
+        case GraphicsInfo.Vulkan:
+            return "Vulkan";
+        case GraphicsInfo.Metal:
+            return "Metal";
+        case GraphicsInfo.OpenGL:
+            return "OpenGL";
+        case GraphicsInfo.Null:
+            return "Null";
+        case GraphicsInfo.Direct3D11Rhi:
+            return "Direct3D11 Rhi";
+        case GraphicsInfo.VulkanRhi:
+            return "Vulkan Rhi";
+        case GraphicsInfo.MetalRhi:
+            return "Metal Rhi";
+        case GraphicsInfo.OpenGLRhi:
+            return "OpenGL Rhi";
+        case GraphicsInfo.Software:
+            return "Software";
+        case GraphicsInfo.NullRhi:
+            return "Null Rhi";
+        case GraphicsInfo.Unknown:
+            return "Unknown";
+        }
+        return "What?";
+    }
+
     Shortcut {
         sequence: StandardKey.Open
         onActivated: fileDialog.open()
@@ -45,6 +75,7 @@ Window {
         anchors.fill: parent
         url: fileDialog.file
         logLevel: MDKPlayer.LogLevel.Info
+        hardwareDecoding: true
         onVideoSizeChanged: {
             if (window.visibility === Window.Windowed) {
                 window.width = mdkPlayer.videoSize.width;
@@ -118,68 +149,81 @@ Window {
             left: parent.left
             right: parent.right
             bottom: parent.bottom
+            bottomMargin: 20
         }
         visible: mdkPlayer.playbackState !== MDKPlayer.PlaybackState.Stopped
         to: mdkPlayer.duration
         value: mdkPlayer.position
         onMoved: mdkPlayer.seek(slider.value)
+
+        background: Rectangle {
+            id: slider_background
+            x: slider.leftPadding
+            y: slider.topPadding + slider.availableHeight / 2 - height / 2
+            implicitWidth: 200
+            implicitHeight: 7
+            width: slider.availableWidth
+            height: implicitHeight
+            radius: 2
+            color: "#bdbebf"
+
+            Rectangle {
+                width: slider.visualPosition * parent.width
+                height: parent.height
+                color: "#21be2b"
+                radius: 2
+            }
+
+            MouseArea {
+                hoverEnabled: true
+                anchors.fill: parent
+                onEntered: preview.visible = true
+                onExited: preview.visible = false
+                onPositionChanged: {
+                    var minX = 0;
+                    var maxX = window.width - preview.width;
+                    var curX = mouseX - (preview.width / 2);
+                    var newX = (curX < minX) ? minX : ((curX > maxX) ? maxX : curX);
+                    preview.x = newX;
+                    var newPos = (mouseX - slider_background.x) / slider_background.width;
+                    preview.seek(newPos * mdkPlayer.duration, false);
+                }
+            }
+        }
+
+        handle: Rectangle {
+            x: slider.leftPadding + slider.visualPosition * (slider.availableWidth - width)
+            y: slider.topPadding + slider.availableHeight / 2 - height / 2
+            implicitWidth: 20
+            implicitHeight: 20
+            radius: 10
+            color: slider.pressed ? "#f0f0f0" : "#f6f6f6"
+            border.color: "#bdbebf"
+        }
     }
 
     MDKPlayer {
         id: preview
-        visible: mdkPlayer.playbackState !== MDKPlayer.PlaybackState.Stopped
+        visible: false
         url: mdkPlayer.url
         livePreview: true
-        //hardwareDecoding: true
-        width: 200
-        height: 100
-    }
+        hardwareDecoding: true
+        width: 300
+        height: 168.75
+        y: window.height - preview.height - 50;
 
-    MouseArea {
-        enabled: mdkPlayer.playbackState !== MDKPlayer.PlaybackState.Stopped
-        anchors {
-            bottom: parent.bottom
-            left: parent.left
-            right: parent.right
+        Label {
+            anchors {
+                horizontalCenter: parent.horizontalCenter
+                bottom: parent.bottom
+                bottomMargin: 5
+            }
+            color: "red"
+            font {
+                bold: true
+                pointSize: 15
+            }
+            text: preview.positionText
         }
-        height: 60
-        propagateComposedEvents: true
-        hoverEnabled: true
-        onPositionChanged: (mouse)=> {
-            preview.seek(mouseX / window.width * mdkPlayer.duration, false)
-            preview.x = mouseX - (preview.width / 2);
-            preview.y = window.height - preview.height - 50;
-            mouse.accepted = false;
-        }
-    }
-
-    function gfxApi() {
-        switch (GraphicsInfo.api) {
-        case GraphicsInfo.Direct3D11:
-            return "Direct3D11";
-        case GraphicsInfo.Vulkan:
-            return "Vulkan";
-        case GraphicsInfo.Metal:
-            return "Metal";
-        case GraphicsInfo.OpenGL:
-            return "OpenGL";
-        case GraphicsInfo.Null:
-            return "Null";
-        case GraphicsInfo.Direct3D11Rhi:
-            return "Direct3D11 Rhi";
-        case GraphicsInfo.VulkanRhi:
-            return "Vulkan Rhi";
-        case GraphicsInfo.MetalRhi:
-            return "Metal Rhi";
-        case GraphicsInfo.OpenGLRhi:
-            return "OpenGL Rhi";
-        case GraphicsInfo.Software:
-            return "Software";
-        case GraphicsInfo.NullRhi:
-            return "Null Rhi";
-        case GraphicsInfo.Unknown:
-            return "Unknown";
-        }
-        return "What?";
     }
 }

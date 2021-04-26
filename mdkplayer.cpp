@@ -74,8 +74,7 @@ static inline QStringList suffixesToMimeTypes(const QStringList &suffixes)
 
 static inline QString timeToString(const qint64 ms)
 {
-    const QTime time = QTime().addMSecs(ms);
-    return time.toString((time.hour() > 0) ? QStringLiteral("hh:mm:ss") : QStringLiteral("mm:ss"));
+    return QTime(0, 0).addMSecs(ms).toString(QStringLiteral("hh:mm:ss"));
 }
 
 static inline std::vector<std::string> qStringListToStdStringVector(const QStringList &stringList)
@@ -701,21 +700,19 @@ void MDKPlayer::setLivePreview(const bool value)
         if (m_livePreview) {
             // Disable log output, otherwise they'll mix up with the real
             // player.
-            MDK_NS_PREPEND(SetGlobalOption)("logLevel", MDK_NS_PREPEND(LogLevel)::Off);
+            //MDK_NS_PREPEND(SetGlobalOption)("logLevel", MDK_NS_PREPEND(LogLevel)::Off);
             // We only need static images.
             m_player->setState(MDK_NS_PREPEND(PlaybackState)::Paused);
             // We don't want the preview window play sound.
             m_player->setMute(true);
-            // Decode as soon as possible when media data received. It also
-            // ensures the maximum delay of rendered video is one second and no
-            // accumulated delay.
-            m_player->setBufferRange(0, 1000, true);
+            // Decode as soon as possible when media data received.
+            m_player->setBufferRange(0);
             // Prevent player stop playing after EOF is reached.
             m_player->setProperty("continue_at_end", "1");
             // And don't forget to use accurate seek.
         } else {
             // Restore everything to default.
-            m_player->setBufferRange(1000, 2000, false);
+            m_player->setBufferRange(1000);
             m_player->setMute(m_mute);
             m_player->setProperty("continue_at_end", "0");
             //MDK_NS_PREPEND(SetGlobalOption)("logLevel", MDK_NS_PREPEND(LogLevel)::Debug);
