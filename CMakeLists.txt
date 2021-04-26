@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.20)
 
 project(MDKPlayer LANGUAGES CXX)
 
+option(BUILD_DEMO "Build MDKPlayer demo application." ON)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -127,3 +129,7 @@ endif()
 target_include_directories(${PROJECT_NAME} PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>"
 )
+
+if(BUILD_DEMO)
+    add_subdirectory(example)
+endif()
