@@ -25,7 +25,6 @@
 #pragma once
 
 #include "mdkplayer_global.h"
-#include <QtCore/qloggingcategory.h>
 #include <QtCore/qurl.h>
 #include <QtQuick/qquickitem.h>
 #include <mdk/global.h>
@@ -35,16 +34,6 @@ class Player;
 MDK_NS_END
 
 MDKPLAYER_BEGIN_NAMESPACE
-
-Q_DECLARE_LOGGING_CATEGORY(lcMdk)
-Q_DECLARE_LOGGING_CATEGORY(lcMdkLog)
-Q_DECLARE_LOGGING_CATEGORY(lcMdkRenderer)
-Q_DECLARE_LOGGING_CATEGORY(lcMdkD3D11Renderer)
-Q_DECLARE_LOGGING_CATEGORY(lcMdkVulkanRenderer)
-Q_DECLARE_LOGGING_CATEGORY(lcMdkMetalRenderer)
-Q_DECLARE_LOGGING_CATEGORY(lcMdkOpenGLRenderer)
-Q_DECLARE_LOGGING_CATEGORY(lcMdkPlayback)
-Q_DECLARE_LOGGING_CATEGORY(lcMdkMisc)
 
 class VideoTextureNode;
 

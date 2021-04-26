@@ -40,8 +40,8 @@ if(NOT DEFINED CMAKE_ARCHIVE_OUTPUT_DIRECTORY)
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
 endif()
 
-find_package(QT NAMES Qt6 Qt5 COMPONENTS Quick REQUIRED)
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Quick REQUIRED)
+find_package(QT NAMES Qt6 Qt5 COMPONENTS Gui Quick REQUIRED)
+find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Gui Quick REQUIRED)
 find_package(Vulkan)
 
 set(_MDK_SDK_DIR_PATH $ENV{MDK_SDK_DIR})
@@ -64,6 +64,10 @@ set(SOURCES
     mdkplayer.cpp
     mdkwrapper.h
     mdkwrapper.cpp
+    videotexturenode.h
+    videotexturenode.cpp
+    videotexturenode_public.cpp
+    videotexturenode_private.cpp
 )
 
 if(WIN32 AND BUILD_SHARED_LIBS)
@@ -107,7 +111,10 @@ if(WIN32)
 endif()
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
+    Qt${QT_VERSION_MAJOR}::Gui
+    Qt${QT_VERSION_MAJOR}::GuiPrivate
     Qt${QT_VERSION_MAJOR}::Quick
+    Qt${QT_VERSION_MAJOR}::QuickPrivate
     mdk
 )
 
