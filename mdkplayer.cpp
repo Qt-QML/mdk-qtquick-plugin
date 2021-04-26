@@ -72,9 +72,10 @@ static inline QStringList suffixesToMimeTypes(const QStringList &suffixes)
     return mimeTypes;
 }
 
-static inline QString timeToString(const qint64 ms, const bool isAudio = false)
+static inline QString timeToString(const qint64 ms)
 {
-    return QTime(0, 0).addMSecs(ms).toString(isAudio ? QStringLiteral("mm:ss") : QStringLiteral("hh:mm:ss"));
+    const QTime time = QTime().addMSecs(ms);
+    return time.toString((time.hour() > 0) ? QStringLiteral("hh:mm:ss") : QStringLiteral("mm:ss"));
 }
 
 static inline std::vector<std::string> qStringListToStdStringVector(const QStringList &stringList)
@@ -589,12 +590,12 @@ QStringList MDKPlayer::audioMimeTypes()
 
 QString MDKPlayer::positionText() const
 {
-    return isStopped() ? QString{} : timeToString(position(), currentIsAudio());
+    return isStopped() ? QString{} : timeToString(position());
 }
 
 QString MDKPlayer::durationText() const
 {
-    return isStopped() ? QString{} : timeToString(duration(), currentIsAudio());
+    return isStopped() ? QString{} : timeToString(duration());
 }
 
 bool MDKPlayer::hardwareDecoding() const
@@ -865,42 +866,6 @@ void MDKPlayer::snapshot()
                            }
                            return qUtf8Printable(path);
                        });
-}
-
-bool MDKPlayer::isVideo(const QUrl &value)
-{
-    if (value.isValid()) {
-        return videoSuffixes().contains(QStringLiteral("*.")
-                                            + QFileInfo(value.fileName()).suffix(),
-                                        Qt::CaseInsensitive);
-    }
-    return false;
-}
-
-bool MDKPlayer::isAudio(const QUrl &value)
-{
-    if (value.isValid()) {
-        return audioSuffixes().contains(QStringLiteral("*.")
-                                            + QFileInfo(value.fileName()).suffix(),
-                                        Qt::CaseInsensitive);
-    }
-    return false;
-}
-
-bool MDKPlayer::currentIsVideo() const
-{
-    if (isStopped()) {
-        return false;
-    }
-    return isVideo(url());
-}
-
-bool MDKPlayer::currentIsAudio() const
-{
-    if (isStopped()) {
-        return false;
-    }
-    return isAudio(url());
 }
 
 void MDKPlayer::seekBackward(const int value)

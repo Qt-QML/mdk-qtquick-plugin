@@ -437,10 +437,6 @@ public Q_SLOTS:
     bool isPlaying() const;
     bool isPaused() const;
     bool isStopped() const;
-    static bool isVideo(const QUrl &value);
-    static bool isAudio(const QUrl &value);
-    bool currentIsVideo() const;
-    bool currentIsAudio() const;
     void startRecording(const QUrl &value, const QString &format = {});
     void stopRecording();
     void seekBackward(const int value = 5000);
