@@ -166,6 +166,7 @@ QSGNode *MDKPlayer::updatePaintNode(QSGNode *node, UpdatePaintNodeData *data)
         return nullptr;
     }
     if (!n) {
+        // Use createNodePrivate() to switch to private QtRHI APIs.
         m_node = createNodePublic(this);
         n = m_node;
     }
