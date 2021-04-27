@@ -57,7 +57,7 @@ Notes
 
 ## Compilation
 
-Before doing anything else, please make sure you have a compiler that supports at least C++14 and a recent version of Qt.
+**Since this project makes heavy usage of QtRHI, you'll need Qt 5.14 or greater to build this project. It's recommended to use Qt 5.15 or Qt 6.**
 
 1. Checkout source code:
 
