@@ -459,9 +459,6 @@ MDKPlayer::LogLevel MDKPlayer::logLevel() const
 
 void MDKPlayer::setLogLevel(const MDKPlayer::LogLevel value)
 {
-    if (value == logLevel()) {
-        return;
-    }
     MDK_NS_PREPEND(LogLevel) logLv = MDK_NS_PREPEND(LogLevel)::Debug;
     switch (value) {
     case LogLevel::Off:
@@ -698,9 +695,6 @@ void MDKPlayer::setLivePreview(const bool value)
     if (m_livePreview != value) {
         m_livePreview = value;
         if (m_livePreview) {
-            // Disable log output, otherwise they'll mix up with the real
-            // player.
-            //MDK_NS_PREPEND(SetGlobalOption)("logLevel", MDK_NS_PREPEND(LogLevel)::Off);
             // We only need static images.
             m_player->setState(MDK_NS_PREPEND(PlaybackState)::Paused);
             // We don't want the preview window play sound.
@@ -715,7 +709,6 @@ void MDKPlayer::setLivePreview(const bool value)
             m_player->setBufferRange(1000);
             m_player->setMute(m_mute);
             m_player->setProperty("continue_at_end", "0");
-            //MDK_NS_PREPEND(SetGlobalOption)("logLevel", MDK_NS_PREPEND(LogLevel)::Debug);
         }
         Q_EMIT livePreviewChanged();
     }
@@ -941,22 +934,20 @@ void MDKPlayer::timerEvent(QTimerEvent *event)
 void MDKPlayer::initMdkHandlers()
 {
     MDK_NS_PREPEND(setLogHandler)([this](MDK_NS_PREPEND(LogLevel) level, const char *msg) {
-        if (m_livePreview) {
-            return;
-        }
+        const QString prefix = (m_livePreview ? QStringLiteral("[PREVIEW]") : QStringLiteral("[MAIN]")) + objectName();
         switch (level) {
         case MDK_NS_PREPEND(LogLevel)::Info:
-            qInfo() << msg;
+            qInfo().noquote() << prefix << msg;
             break;
         case MDK_NS_PREPEND(LogLevel)::All:
         case MDK_NS_PREPEND(LogLevel)::Debug:
-            qDebug() << msg;
+            qDebug().noquote() << prefix << msg;
             break;
         case MDK_NS_PREPEND(LogLevel)::Warning:
-            qWarning() << msg;
+            qWarning().noquote() << prefix << msg;
             break;
         case MDK_NS_PREPEND(LogLevel)::Error:
-            qCritical() << msg;
+            qCritical().noquote() << prefix << msg;
             break;
         default:
             break;
