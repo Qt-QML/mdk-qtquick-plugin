@@ -27,11 +27,13 @@
 #include "mdkplayer_global.h"
 #include <QtCore/qurl.h>
 #include <QtQuick/qquickitem.h>
-#include <mdk/global.h>
 
-MDK_NS_BEGIN
+namespace mdk
+{
+
 class Player;
-MDK_NS_END
+
+}
 
 MDKPLAYER_BEGIN_NAMESPACE
 
@@ -529,7 +531,7 @@ private:
 
     FillMode m_fillMode = FillMode::PreserveAspectFit;
     MediaInfo m_mediaInfo = {};
-    MDK_NS_PREPEND(MediaStatus) m_mediaStatus = MDK_NS_PREPEND(MediaStatus)::NoMedia;
+    int m_mediaStatus = 0;
 };
 
 MDKPLAYER_END_NAMESPACE

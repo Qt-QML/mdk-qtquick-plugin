@@ -843,20 +843,15 @@ void MDKPlayer::snapshot()
         return;
     }
     MDK_NS_PREPEND(Player)::SnapshotRequest snapshotRequest = {};
-    m_player->snapshot(&snapshotRequest,
-                       [this](MDK_NS_PREPEND(Player)::SnapshotRequest *ret, qreal frameTime) {
-                           Q_UNUSED(ret);
-                           const QString path = QStringLiteral("%1%2%3_%4.%5")
-                                                    .arg(snapshotDirectory(),
-                                                         QDir::separator(),
-                                                         fileName(),
-                                                         QString::number(frameTime),
-                                                         snapshotFormat());
-                           if (!m_livePreview) {
-                               qDebug() << "Taking snapshot -->" << path;
-                           }
-                           return qUtf8Printable(path);
-                       });
+    m_player->snapshot(&snapshotRequest, [this](MDK_NS_PREPEND(Player)::SnapshotRequest *ret, qreal frameTime) {
+        Q_UNUSED(ret);
+        const QString path = QStringLiteral("%1%2%3_%4.%5").arg(
+                snapshotDirectory(), QDir::separator(), fileName(), QString::number(frameTime), snapshotFormat());
+        if (!m_livePreview) {
+            qDebug() << "Taking snapshot -->" << path;
+        }
+        return path.toStdString();
+    });
 }
 
 void MDKPlayer::seekBackward(const int value)
@@ -965,7 +960,7 @@ void MDKPlayer::initMdkHandlers()
         Q_EMIT urlChanged();
     });
     m_player->onMediaStatusChanged([this](MDK_NS_PREPEND(MediaStatus) ms) {
-        if (MDK_NS_PREPEND(flags_added)(m_mediaStatus, ms, MDK_NS_PREPEND(MediaStatus)::Loaded)) {
+        if (MDK_NS_PREPEND(flags_added)(static_cast<MDK_NS_PREPEND(MediaStatus)>(m_mediaStatus), ms, MDK_NS_PREPEND(MediaStatus)::Loaded)) {
             const auto &info = m_player->mediaInfo();
             m_mediaInfo.startTime = info.start_time;
             m_mediaInfo.duration = info.duration;
@@ -1052,7 +1047,7 @@ void MDKPlayer::initMdkHandlers()
                 qDebug() << "Media loaded.";
             }
         }
-        m_mediaStatus = ms;
+        m_mediaStatus = static_cast<int>(ms);
         Q_EMIT mediaStatusChanged();
         return true;
     });
@@ -1115,7 +1110,7 @@ void MDKPlayer::resetInternalData()
     m_hasChapters = false;
     //m_loop = false;
     m_mediaInfo = {};
-    m_mediaStatus = MDK_NS_PREPEND(MediaStatus)::NoMedia;
+    m_mediaStatus = static_cast<int>(MDK_NS_PREPEND(MediaStatus)::NoMedia);
     Q_EMIT urlChanged();
     Q_EMIT positionChanged();
     Q_EMIT durationChanged();
